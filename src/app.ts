@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import sessionRoutes from "./routes/sessionRoutes";
 
 const app = express();
 
@@ -11,5 +12,7 @@ app.get("/", (_req, res) => {
     message: "SafeLink API is running",
   });
 });
+
+app.use("/session", sessionRoutes);
 
 export default app;
