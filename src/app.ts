@@ -2,17 +2,23 @@ import express from "express";
 import cors from "cors";
 import sessionRoutes from "./routes/sessionRoutes";
 
+import servicesRouter from "./routes/services";
+import conversationsRouter from "./routes/conversations";
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (_req, res) => {
-  res.json({
-    message: "SafeLink API is running",
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "SafeLink backend is running",
   });
 });
 
+app.use("/api/services", servicesRouter);
+app.use("/api/conversations", conversationsRouter);
 app.use("/session", sessionRoutes);
 
 export default app;
