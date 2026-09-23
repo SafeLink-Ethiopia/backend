@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import sessionRoutes from "./routes/sessionRoutes";
 
 import servicesRouter from "./routes/services";
 import conversationsRouter from "./routes/conversations";
@@ -18,5 +19,6 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/services", servicesRouter);
 app.use("/api/conversations", conversationsRouter);
+app.use("/session", sessionRoutes);
 
 export default app;
