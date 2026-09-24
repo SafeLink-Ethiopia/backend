@@ -4,6 +4,7 @@ import cors from "cors";
 import sessionRoutes from "./routes/sessionRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import awarenessPostRoutes from "./routes/awarenessPostRoutes";
+import ragRoutes from "./routes/ragRoutes";
 
 const app = express();
 
@@ -22,5 +23,6 @@ app.use("/session", sessionRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.use("/api/admin/awareness-posts", awarenessPostRoutes);
+app.use("/api/admin/rag", ragRoutes);
 
 export default app;
