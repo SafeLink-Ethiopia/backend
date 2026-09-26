@@ -24,14 +24,14 @@ router.post(
 
       const conversationId = `CONV-${Date.now()}`;
 
-      const conversation = await Conversation.create({
-        conversation_id: conversationId,
-        session_id,
-        advisor_id: "ADV-MED-001",
-        messages: [],
-        recommendation: null,
-      });
-
+     const conversation = await Conversation.create({
+       conversation_id: conversationId,
+       session_id,
+       advisor_id: "ADV-MED-001",
+       advisor_type: "medical",
+       messages: [],
+       recommendation: null,
+     });
       res.status(201).json({
         success: true,
         message: "Medical conversation created",
@@ -111,7 +111,80 @@ router.post(
     }
   }
 );
+/**
+ * GET /api/conversations/session/:sessionId
+ *
+ * Retrieves all visible conversations belonging to a SafeLink session.
+ */
+router.get(
+  "/session/:sessionId",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { sessionId } = req.params;
 
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          message: "sessionId is required",
+        });
+        return;
+      }
+
+      const conversations = await Conversation.find({
+        session_id: sessionId,
+        hidden_for_user: false,
+      }).sort({
+        updated_at: -1,
+      });
+
+      res.status(200).json({
+        success: true,
+        conversations,
+      });
+    } catch (error) {
+      console.error("Error fetching user conversations:", error);
+
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch conversations",
+      });
+    }
+  }
+);
+router.get(
+  "/session/:sessionId/:conversationId",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { sessionId, conversationId } = req.params;
+
+      const conversation = await Conversation.findOne({
+        conversation_id: conversationId,
+        session_id: sessionId,
+        hidden_for_user: false,
+      });
+
+      if (!conversation) {
+        res.status(404).json({
+          success: false,
+          message: "Conversation not found",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        conversation,
+      });
+    } catch (error) {
+      console.error("Error fetching conversation:", error);
+
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch conversation",
+      });
+    }
+  },
+);
 /**
  * GET /api/conversations/:id
  *

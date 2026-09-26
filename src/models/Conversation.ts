@@ -1,9 +1,12 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
 
+export type AdvisorType = "general" | "medical" | "legal" | "psychological";
+
 export interface IMessage {
   sender: "user" | "advisor";
   text: string;
   timestamp: Date;
+  edited?: boolean;
 }
 
 export interface IRecommendation {
@@ -17,8 +20,13 @@ export interface IConversation extends Document {
   conversation_id: string;
   session_id: string;
   advisor_id: string;
+  advisor_type: AdvisorType;
   messages: IMessage[];
   recommendation: IRecommendation | null;
+  urgent: boolean;
+  hidden_for_user: boolean;
+  created_at: Date;
+  updated_at: Date;
 }
 
 const messageSchema = new Schema<IMessage>(
@@ -40,10 +48,15 @@ const messageSchema = new Schema<IMessage>(
       required: true,
       default: Date.now,
     },
+
+    edited: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     _id: false,
-  }
+  },
 );
 
 const recommendationSchema = new Schema<IRecommendation>(
@@ -74,7 +87,7 @@ const recommendationSchema = new Schema<IRecommendation>(
   },
   {
     _id: false,
-  }
+  },
 );
 
 const conversationSchema = new Schema<IConversation>(
@@ -100,6 +113,12 @@ const conversationSchema = new Schema<IConversation>(
       trim: true,
     },
 
+    advisor_type: {
+      type: String,
+      enum: ["general", "medical", "legal", "psychological"],
+      required: true,
+    },
+
     messages: {
       type: [messageSchema],
       default: [],
@@ -109,17 +128,28 @@ const conversationSchema = new Schema<IConversation>(
       type: recommendationSchema,
       default: null,
     },
+
+    urgent: {
+      type: Boolean,
+      default: false,
+    },
+
+    hidden_for_user: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     collection: "conversations",
-  }
+    timestamps: {
+      createdAt: "created_at",
+      updatedAt: "updated_at",
+    },
+  },
 );
 
 const Conversation: Model<IConversation> =
   mongoose.models.Conversation ||
-  mongoose.model<IConversation>(
-    "Conversation",
-    conversationSchema
-  );
+  mongoose.model<IConversation>("Conversation", conversationSchema);
 
 export default Conversation;
