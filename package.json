@@ -3,10 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "ts-node-dev --respawn --transpile-only -r dotenv/config src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
-    "seed:awareness": "ts-node src/scripts/seedAwarenessKnowledge.ts"
+    "start": "node dist/server.js"
   },
   "keywords": [],
   "author": "",

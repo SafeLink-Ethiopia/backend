@@ -10,12 +10,9 @@ import {
   sendAdvisorResetOtp,
 } from "../services/emailService";
 
-// =====================================================
-// HELPER FUNCTIONS
-// =====================================================
-
 const generateAdvisorId = (): string => {
-  return `ADV-${randomUUID()}`;
+  const uuid = randomUUID();
+  return `ADV-${uuid.slice(0, 8)}-${uuid.slice(9, 13)}`;
 };
 
 const generateTemporaryPassword = (): string => {
@@ -23,16 +20,12 @@ const generateTemporaryPassword = (): string => {
 };
 
 const generateOtp = (): string => {
-  return randomInt(1000, 10000).toString();
+  return randomInt(100000, 1000000).toString();
 };
 
 const hashResetToken = (token: string): string => {
   return createHash("sha256").update(token).digest("hex");
 };
-
-// =====================================================
-// CREATE ADVISOR
-// =====================================================
 
 export const createAdvisor = async (
   req: Request,
@@ -49,10 +42,6 @@ export const createAdvisor = async (
       working_hours,
       active,
     } = req.body;
-
-    // -------------------------------------------------
-    // VALIDATION
-    // -------------------------------------------------
 
     if (!name || typeof name !== "string") {
       res.status(400).json({
@@ -110,10 +99,6 @@ export const createAdvisor = async (
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // -------------------------------------------------
-    // CHECK EXISTING EMAIL
-    // -------------------------------------------------
-
     const existingAdvisor = await Advisor.findOne({
       email: normalizedEmail,
     });
@@ -125,61 +110,31 @@ export const createAdvisor = async (
       return;
     }
 
-    // -------------------------------------------------
-    // GENERATE ADVISOR ID
-    // -------------------------------------------------
-
     const advisor_id = generateAdvisorId();
-
-    // -------------------------------------------------
-    // GENERATE TEMPORARY PASSWORD
-    // -------------------------------------------------
-
     const temporaryPassword = generateTemporaryPassword();
-
     const passwordHash = await bcrypt.hash(temporaryPassword, 10);
-
-    // -------------------------------------------------
-    // CREATE ADVISOR
-    // -------------------------------------------------
 
     const advisor = await Advisor.create({
       advisor_id,
-
       name: name.trim(),
-
       email: normalizedEmail,
-
       gender,
-
       type,
-
       phone_number: phone_number.trim(),
-
       location: location.trim(),
-
       working_hours: {
         start: working_hours.start,
         end: working_hours.end,
       },
-
       active: active !== undefined ? active : true,
-
       passwordHash,
-
       mustChangePassword: true,
-
       resetOtpHash: null,
       resetOtpExpires: null,
       resetOtpAttempts: 0,
-
       resetTokenHash: null,
       resetTokenExpires: null,
     });
-
-    // -------------------------------------------------
-    // SEND LOGIN CREDENTIALS BY EMAIL
-    // -------------------------------------------------
 
     try {
       await sendAdvisorCredentials(
@@ -191,9 +146,6 @@ export const createAdvisor = async (
     } catch (emailError) {
       console.error("Send advisor credentials email error:", emailError);
 
-      // If the email cannot be sent, remove the advisor
-      // so an account is not created without credentials
-      // being delivered.
       await Advisor.deleteOne({
         _id: advisor._id,
       });
@@ -206,13 +158,8 @@ export const createAdvisor = async (
       return;
     }
 
-    // -------------------------------------------------
-    // SUCCESS RESPONSE
-    // -------------------------------------------------
-
     res.status(201).json({
       message: "Advisor created successfully.",
-
       advisor: {
         id: advisor._id,
         advisor_id: advisor.advisor_id,
@@ -236,20 +183,12 @@ export const createAdvisor = async (
   }
 };
 
-// =====================================================
-// ADVISOR LOGIN
-// =====================================================
-
 export const loginAdvisor = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
   try {
     const { advisor_id, password } = req.body;
-
-    // -------------------------------------------------
-    // VALIDATE ADVISOR ID
-    // -------------------------------------------------
 
     if (!advisor_id || typeof advisor_id !== "string") {
       res.status(400).json({
@@ -258,20 +197,12 @@ export const loginAdvisor = async (
       return;
     }
 
-    // -------------------------------------------------
-    // VALIDATE PASSWORD
-    // -------------------------------------------------
-
     if (!password || typeof password !== "string") {
       res.status(400).json({
         message: "Password is required.",
       });
       return;
     }
-
-    // -------------------------------------------------
-    // FIND ADVISOR
-    // -------------------------------------------------
 
     const advisor = await Advisor.findOne({
       advisor_id: advisor_id.trim(),
@@ -284,20 +215,12 @@ export const loginAdvisor = async (
       return;
     }
 
-    // -------------------------------------------------
-    // CHECK ACCOUNT STATUS
-    // -------------------------------------------------
-
     if (!advisor.active) {
       res.status(403).json({
         message: "This advisor account is inactive.",
       });
       return;
     }
-
-    // -------------------------------------------------
-    // CHECK PASSWORD
-    // -------------------------------------------------
 
     const passwordMatch = await bcrypt.compare(password, advisor.passwordHash);
 
@@ -308,10 +231,6 @@ export const loginAdvisor = async (
       return;
     }
 
-    // -------------------------------------------------
-    // JWT SECRET
-    // -------------------------------------------------
-
     const jwtSecret = process.env.JWT_SECRET;
 
     if (!jwtSecret) {
@@ -320,10 +239,6 @@ export const loginAdvisor = async (
       });
       return;
     }
-
-    // -------------------------------------------------
-    // CREATE JWT
-    // -------------------------------------------------
 
     const token = jwt.sign(
       {
@@ -336,15 +251,9 @@ export const loginAdvisor = async (
       },
     );
 
-    // -------------------------------------------------
-    // RESPONSE
-    // -------------------------------------------------
-
     res.status(200).json({
       message: "Advisor login successful.",
-
       token,
-
       advisor: {
         advisor_id: advisor.advisor_id,
         name: advisor.name,
@@ -366,10 +275,6 @@ export const loginAdvisor = async (
     });
   }
 };
-
-// =====================================================
-// CHANGE PASSWORD
-// =====================================================
 
 export const changeAdvisorPassword = async (
   req: AdvisorRequest,
@@ -446,7 +351,6 @@ export const changeAdvisorPassword = async (
     }
 
     advisor.passwordHash = await bcrypt.hash(newPassword, 10);
-
     advisor.mustChangePassword = false;
 
     await advisor.save();
@@ -462,10 +366,6 @@ export const changeAdvisorPassword = async (
     });
   }
 };
-
-// =====================================================
-// LOGOUT
-// =====================================================
 
 export const logoutAdvisor = async (
   req: AdvisorRequest,
@@ -493,10 +393,6 @@ export const logoutAdvisor = async (
   }
 };
 
-// =====================================================
-// FORGOT PASSWORD
-// =====================================================
-
 export const forgotAdvisorPassword = async (
   req: Request,
   res: Response,
@@ -517,11 +413,6 @@ export const forgotAdvisorPassword = async (
       email: normalizedEmail,
     });
 
-    /*
-     * We intentionally return the same response whether
-     * the email exists or not.
-     */
-
     if (!advisor || !advisor.active) {
       res.status(200).json({
         message:
@@ -530,36 +421,22 @@ export const forgotAdvisorPassword = async (
       return;
     }
 
-    // -------------------------------------------------
-    // GENERATE OTP
-    // -------------------------------------------------
-
     const otp = generateOtp();
-
     const otpHash = await bcrypt.hash(otp, 10);
 
     advisor.resetOtpHash = otpHash;
-
     advisor.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
-
     advisor.resetOtpAttempts = 0;
-
-    // Invalidate previous reset token
     advisor.resetTokenHash = null;
     advisor.resetTokenExpires = null;
 
     await advisor.save();
-
-    // -------------------------------------------------
-    // SEND OTP THROUGH BREVO
-    // -------------------------------------------------
 
     try {
       await sendAdvisorResetOtp(advisor.email, advisor.name, otp);
     } catch (emailError) {
       console.error("Send reset OTP email error:", emailError);
 
-      // Remove OTP if email delivery failed
       advisor.resetOtpHash = null;
       advisor.resetOtpExpires = null;
       advisor.resetOtpAttempts = 0;
@@ -586,10 +463,6 @@ export const forgotAdvisorPassword = async (
   }
 };
 
-// =====================================================
-// VERIFY RESET OTP
-// =====================================================
-
 export const verifyAdvisorResetOtp = async (
   req: Request,
   res: Response,
@@ -611,9 +484,9 @@ export const verifyAdvisorResetOtp = async (
       return;
     }
 
-    if (!/^\d{4}$/.test(otp)) {
+    if (!/^\d{6}$/.test(otp)) {
       res.status(400).json({
-        message: "OTP must be a 4-digit number.",
+        message: "OTP must be a 6-digit number.",
       });
       return;
     }
@@ -669,19 +542,11 @@ export const verifyAdvisorResetOtp = async (
       return;
     }
 
-    // -------------------------------------------------
-    // OTP CORRECT
-    // -------------------------------------------------
-
     const resetToken = randomBytes(32).toString("hex");
-
     const resetTokenHash = hashResetToken(resetToken);
 
     advisor.resetTokenHash = resetTokenHash;
-
     advisor.resetTokenExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-    // Make OTP single-use
     advisor.resetOtpHash = null;
     advisor.resetOtpExpires = null;
     advisor.resetOtpAttempts = 0;
@@ -700,10 +565,6 @@ export const verifyAdvisorResetOtp = async (
     });
   }
 };
-
-// =====================================================
-// RESET PASSWORD
-// =====================================================
 
 export const resetAdvisorPassword = async (
   req: Request,
@@ -807,14 +668,9 @@ export const resetAdvisorPassword = async (
     }
 
     advisor.passwordHash = await bcrypt.hash(newPassword, 10);
-
     advisor.mustChangePassword = false;
-
-    // Invalidate reset token
     advisor.resetTokenHash = null;
     advisor.resetTokenExpires = null;
-
-    // Clear OTP fields
     advisor.resetOtpHash = null;
     advisor.resetOtpExpires = null;
     advisor.resetOtpAttempts = 0;

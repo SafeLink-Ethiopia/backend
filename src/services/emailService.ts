@@ -1,20 +1,26 @@
-import { BrevoClient } from "@getbrevo/brevo";
+import nodemailer from "nodemailer";
 
-const brevoApiKey = process.env.BREVO_API_KEY;
-const senderEmail = process.env.BREVO_SENDER_EMAIL;
-const senderName = process.env.BREVO_SENDER_NAME || "SafeLink";
+const emailHost = process.env.EMAIL_HOST;
+const emailPort = Number(process.env.EMAIL_PORT || 587);
+const emailUser = process.env.EMAIL_USER;
+const emailPassword = process.env.EMAIL_PASSWORD;
+const senderName = process.env.EMAIL_SENDER_NAME || "SafeLink";
 
-if (!brevoApiKey || !senderEmail) {
+if (!emailHost || !emailUser || !emailPassword) {
   console.warn(
-    "Brevo configuration is incomplete. Check BREVO_API_KEY and BREVO_SENDER_EMAIL.",
+    "Email configuration is incomplete. Check EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD.",
   );
 }
 
-const brevoClient = brevoApiKey
-  ? new BrevoClient({
-      apiKey: brevoApiKey,
-    })
-  : null;
+const transporter = nodemailer.createTransport({
+  host: emailHost,
+  port: emailPort,
+  secure: emailPort === 465,
+  auth: {
+    user: emailUser,
+    pass: emailPassword,
+  },
+});
 
 export const sendAdvisorCredentials = async (
   email: string,
@@ -22,25 +28,17 @@ export const sendAdvisorCredentials = async (
   advisorId: string,
   temporaryPassword: string,
 ): Promise<void> => {
-  if (!brevoClient || !senderEmail) {
+  if (!emailHost || !emailUser || !emailPassword) {
     throw new Error(
-      "Brevo configuration is incomplete. Check BREVO_API_KEY and BREVO_SENDER_EMAIL.",
+      "Email configuration is incomplete. Check EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD.",
     );
   }
 
-  await brevoClient.transactionalEmails.sendTransacEmail({
+  await transporter.sendMail({
+    from: `"${senderName}" <${emailUser}>`,
+    to: email,
     subject: "SafeLink Advisor Account",
-    sender: {
-      name: senderName,
-      email: senderEmail,
-    },
-    to: [
-      {
-        email,
-        name: advisorName,
-      },
-    ],
-    textContent: `Hello ${advisorName},
+    text: `Hello ${advisorName},
 
 Your SafeLink advisor account has been created.
 
@@ -59,7 +57,7 @@ You will be required to change your temporary password after your first login.
 If you did not expect this account, please contact the SafeLink administrator.
 
 SafeLink Team`,
-    htmlContent: `
+    html: `
       <div
         style="
           font-family: Arial, sans-serif;
@@ -123,25 +121,17 @@ export const sendAdvisorResetOtp = async (
   advisorName: string,
   otp: string,
 ): Promise<void> => {
-  if (!brevoClient || !senderEmail) {
+  if (!emailHost || !emailUser || !emailPassword) {
     throw new Error(
-      "Brevo configuration is incomplete. Check BREVO_API_KEY and BREVO_SENDER_EMAIL.",
+      "Email configuration is incomplete. Check EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD.",
     );
   }
 
-  await brevoClient.transactionalEmails.sendTransacEmail({
+  await transporter.sendMail({
+    from: `"${senderName}" <${emailUser}>`,
+    to: email,
     subject: "SafeLink Password Reset OTP",
-    sender: {
-      name: senderName,
-      email: senderEmail,
-    },
-    to: [
-      {
-        email,
-        name: advisorName,
-      },
-    ],
-    textContent: `Hello ${advisorName},
+    text: `Hello ${advisorName},
 
 We received a request to reset your SafeLink advisor account password.
 
@@ -154,7 +144,7 @@ This code will expire in 10 minutes.
 If you did not request a password reset, you can safely ignore this email.
 
 SafeLink Team`,
-    htmlContent: `
+    html: `
       <div
         style="
           font-family: Arial, sans-serif;
