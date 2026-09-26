@@ -4,6 +4,11 @@ import dns from "node:dns";
 import app from "./app";
 import connectDB from "./config/db";
 import awarenessRoutes from "./routes/awarenessRoutes";
+import facilitiesRouter from "./routes/facilities";
+
+
+app.use("/api/facilities", facilitiesRouter);
+
 dotenv.config();
 
 // Force DNS resolution through Google DNS
