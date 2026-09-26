@@ -1,5 +1,16 @@
 import { Router } from "express";
 import * as advisorController from "../controllers/advisorController";
+import {
+  createAdvisor,
+  loginAdvisor,
+  changeAdvisorPassword,
+  logoutAdvisor,
+  forgotAdvisorPassword,
+  verifyAdvisorResetOtp,
+  resetAdvisorPassword,
+} from "../controllers/advisorController";
+import { adminAuthMiddleware } from "../middleware/adminAuthMiddleware";
+import { advisorAuthMiddleware } from "../middleware/advisorAuthMiddleware";
 
 const router = Router();
 
@@ -11,5 +22,12 @@ router.patch("/conversation/:id/message/:index", advisorController.patchMessage)
 router.post("/conversation/:id/clear", advisorController.postClear);
 router.delete("/conversation/:id", advisorController.deleteConversation);
 router.post("/conversation/:id/suggest", advisorController.postSuggest);
+router.post("/", adminAuthMiddleware, createAdvisor);
+router.post("/login", loginAdvisor);
+router.post("/change-password", advisorAuthMiddleware, changeAdvisorPassword);
+router.post("/logout", advisorAuthMiddleware, logoutAdvisor);
+router.post("/forgot-password", forgotAdvisorPassword);
+router.post("/verify-reset-otp", verifyAdvisorResetOtp);
+router.post("/reset-password", resetAdvisorPassword);
 
 export default router;

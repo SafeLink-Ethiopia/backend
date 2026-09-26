@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export type AdvisorType = "medical" | "legal" | "psychological" | "general";
-export type AdvisorGender = "male" | "female" ;
+export type AdvisorGender = "male" | "female";
 export interface IAdvisor extends Document {
   advisor_id: string;
   type: AdvisorType;
@@ -14,9 +14,9 @@ export interface IAdvisor extends Document {
   passwordHash: string;
   working_hours: {
     start: string; // "09:00"
-    end: string;   // "17:00"
+    end: string; // "17:00"
   };
-   mustChangePassword: boolean;
+  mustChangePassword: boolean;
 
   resetOtpHash?: string | null;
   resetOtpExpires?: Date | null;
@@ -24,7 +24,7 @@ export interface IAdvisor extends Document {
 
   resetTokenHash?: string | null;
   resetTokenExpires?: Date | null;
-   createdAt: Date;
+  createdAt: Date;
   updatedAt: Date;
 }
 
@@ -36,51 +36,51 @@ const AdvisorSchema = new Schema<IAdvisor>({
     required: true,
   },
   name: { type: String, required: true },
-      email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-        gender: {
-      type: String,
-      required: true,
-      enum: ["male", "female"],
-    },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+  },
+  gender: {
+    type: String,
+    required: true,
+    enum: ["male", "female"],
+  },
   phone_number: { type: String, default: "" },
   location: { type: String, default: "" },
   active: { type: Boolean, default: true },
-   passwordHash: {
-      type: String,
-      required: true,
-    },
-      mustChangePassword: {
-      type: Boolean,
-      default: true,
-    },
-       resetOtpHash: {
-      type: String,
-      default: null,
-    },
+  passwordHash: {
+    type: String,
+    required: true,
+  },
+  mustChangePassword: {
+    type: Boolean,
+    default: true,
+  },
+  resetOtpHash: {
+    type: String,
+    default: null,
+  },
 
-    resetOtpExpires: {
-      type: Date,
-      default: null,
-    },
-        resetOtpAttempts: {
-      type: Number,
-      default: 0,
-    },
+  resetOtpExpires: {
+    type: Date,
+    default: null,
+  },
+  resetOtpAttempts: {
+    type: Number,
+    default: 0,
+  },
 
-    resetTokenHash: {
-      type: String,
-      default: null,
-    },
-       resetTokenExpires: {
-      type: Date,
-      default: null,
-    },
+  resetTokenHash: {
+    type: String,
+    default: null,
+  },
+  resetTokenExpires: {
+    type: Date,
+    default: null,
+  },
   working_hours: {
     start: { type: String, default: "00:00" },
     end: { type: String, default: "23:59" },

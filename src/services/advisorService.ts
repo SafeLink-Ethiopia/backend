@@ -88,6 +88,12 @@ export function getConversationsForSession(sessionId: string) {
     hidden_for_user: false,
   }).sort({ "messages.timestamp": -1 });
 }
+export function getConversationsForAdvisor(advisorId: string) {
+  return Conversation.find({ advisor_id: advisorId }).sort({
+    urgent: -1,
+    "messages.timestamp": -1,
+  });
+}
 
 export async function addMessage(
   conversationId: string,
