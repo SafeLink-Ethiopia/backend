@@ -1,125 +1,59 @@
-import mongoose, { Document, Model, Schema } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
+import type { AdvisorType } from "./Advisor";
 
-export interface IMessage {
+interface IMessage {
   sender: "user" | "advisor";
   text: string;
   timestamp: Date;
-}
-
-export interface IRecommendation {
-  facility_name: string;
-  location: string;
-  contact: string;
-  notes: string;
+  edited: boolean;
 }
 
 export interface IConversation extends Document {
   conversation_id: string;
   session_id: string;
   advisor_id: string;
+  advisor_type: AdvisorType;
+  urgent: boolean;
+  hidden_for_user: boolean;
   messages: IMessage[];
-  recommendation: IRecommendation | null;
+  suggested_advisor_types: AdvisorType[];
+  recommendation?: {
+    facility_name: string;
+    location: string;
+    contact: string;
+    notes: string;
+  };
 }
 
-const messageSchema = new Schema<IMessage>(
+const MessageSchema = new Schema<IMessage>(
   {
-    sender: {
-      type: String,
-      enum: ["user", "advisor"],
-      required: true,
-    },
-
-    text: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    timestamp: {
-      type: Date,
-      required: true,
-      default: Date.now,
-    },
+    sender: { type: String, enum: ["user", "advisor"], required: true },
+    text: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+    edited: { type: Boolean, default: false },
   },
-  {
-    _id: false,
-  }
+  { _id: false }
 );
 
-const recommendationSchema = new Schema<IRecommendation>(
-  {
-    facility_name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    location: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    contact: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    notes: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+const ConversationSchema = new Schema<IConversation>({
+  conversation_id: { type: String, required: true, unique: true },
+  session_id: { type: String, required: true },
+  advisor_id: { type: String, required: true },
+  advisor_type: {
+    type: String,
+    enum: ["medical", "legal", "psychological", "general"],
+    required: true,
   },
-  {
-    _id: false,
-  }
-);
-
-const conversationSchema = new Schema<IConversation>(
-  {
-    conversation_id: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true,
-      trim: true,
-    },
-
-    session_id: {
-      type: String,
-      required: true,
-      index: true,
-      trim: true,
-    },
-
-    advisor_id: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    messages: {
-      type: [messageSchema],
-      default: [],
-    },
-
-    recommendation: {
-      type: recommendationSchema,
-      default: null,
-    },
+  urgent: { type: Boolean, default: false },
+  hidden_for_user: { type: Boolean, default: false },
+  messages: { type: [MessageSchema], default: [] },
+  suggested_advisor_types: { type: [String], default: [] },
+  recommendation: {
+    facility_name: String,
+    location: String,
+    contact: String,
+    notes: String,
   },
-  {
-    collection: "conversations",
-  }
-);
+});
 
-const Conversation: Model<IConversation> =
-  mongoose.models.Conversation ||
-  mongoose.model<IConversation>(
-    "Conversation",
-    conversationSchema
-  );
-
-export default Conversation;
+export default mongoose.model<IConversation>("Conversation", ConversationSchema);

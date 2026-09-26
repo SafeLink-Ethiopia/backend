@@ -1,10 +1,11 @@
 import dotenv from "dotenv";
 import dns from "node:dns";
+import path from "node:path";
 
 import app from "./app";
 import connectDB from "./config/db";
 import awarenessRoutes from "./routes/awarenessRoutes";
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 // Force DNS resolution through Google DNS
 dns.setServers(["8.8.8.8"]);
