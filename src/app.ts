@@ -8,6 +8,7 @@ import awarenessPostRoutes from "./routes/awarenessPostRoutes";
 import servicesRouter from "./routes/services";
 import conversationsRouter from "./routes/conversations";
 import advisorRoutes from "./routes/advisorRoutes";
+import adminDashboardRoutes from "./routes/adminDashboard";
 
 const app = express();
 
@@ -30,5 +31,6 @@ app.use("/api/admin", adminRoutes);
 
 app.use("/api/admin/awareness-posts", awarenessPostRoutes);
 app.use("/api/advisors", advisorRoutes);
+app.use("/api/admin/dashboard", adminDashboardRoutes);
 
 export default app;

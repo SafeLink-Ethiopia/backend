@@ -688,3 +688,302 @@ export const resetAdvisorPassword = async (
     });
   }
 };
+export const getAllAdvisors = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const advisors = await Advisor.find()
+      .select(
+        "advisor_id name email gender type phone_number location working_hours active",
+      )
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      advisors,
+    });
+  } catch (error) {
+    console.error("Get all advisors error:", error);
+
+    res.status(500).json({
+      message: "Failed to retrieve advisors.",
+    });
+  }
+};
+
+export const toggleAdvisorActive = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { advisor_id } = req.params;
+    const { active } = req.body;
+
+    if (!advisor_id || typeof advisor_id !== "string") {
+      res.status(400).json({
+        message: "Advisor ID is required.",
+      });
+      return;
+    }
+
+    if (typeof active !== "boolean") {
+      res.status(400).json({
+        message: "Active must be a boolean value.",
+      });
+      return;
+    }
+
+    const advisor = await Advisor.findOne({
+      advisor_id: advisor_id.trim(),
+    });
+
+    if (!advisor) {
+      res.status(404).json({
+        message: "Advisor not found.",
+      });
+      return;
+    }
+
+    advisor.active = active;
+
+    await advisor.save();
+
+    res.status(200).json({
+      message: `Advisor ${active ? "activated" : "deactivated"} successfully.`,
+      advisor: {
+        id: advisor._id,
+        advisor_id: advisor.advisor_id,
+        name: advisor.name,
+        email: advisor.email,
+        gender: advisor.gender,
+        type: advisor.type,
+        phone_number: advisor.phone_number,
+        location: advisor.location,
+        working_hours: advisor.working_hours,
+        active: advisor.active,
+      },
+    });
+  } catch (error) {
+    console.error("Toggle advisor active error:", error);
+
+    res.status(500).json({
+      message: "Failed to update advisor status.",
+    });
+  }
+};
+
+export const deleteAdvisor = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { advisor_id } = req.params;
+
+    if (!advisor_id || typeof advisor_id !== "string") {
+      res.status(400).json({
+        message: "Advisor ID is required.",
+      });
+      return;
+    }
+
+    const advisor = await Advisor.findOne({
+      advisor_id: advisor_id.trim(),
+    });
+
+    if (!advisor) {
+      res.status(404).json({
+        message: "Advisor not found.",
+      });
+      return;
+    }
+
+    await Advisor.deleteOne({
+      _id: advisor._id,
+    });
+
+    res.status(200).json({
+      message: "Advisor deleted successfully.",
+    });
+  } catch (error) {
+    console.error("Delete advisor error:", error);
+
+    res.status(500).json({
+      message: "Failed to delete advisor.",
+    });
+  }
+};
+
+export const getAdvisorById = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { advisor_id } = req.params;
+
+    if (!advisor_id || typeof advisor_id !== "string") {
+      res.status(400).json({
+        message: "Advisor ID is required.",
+      });
+      return;
+    }
+
+    const advisor = await Advisor.findOne({
+      advisor_id: advisor_id.trim(),
+    })
+      .select(
+        "advisor_id name email gender type phone_number location working_hours active",
+      )
+      .lean();
+
+    if (!advisor) {
+      res.status(404).json({
+        message: "Advisor not found.",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      advisor,
+    });
+  } catch (error) {
+    console.error("Get advisor error:", error);
+
+    res.status(500).json({
+      message: "Failed to retrieve advisor.",
+    });
+  }
+};
+export const updateAdvisor = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { advisor_id } = req.params;
+
+    if (!advisor_id || typeof advisor_id !== "string") {
+      res.status(400).json({
+        message: "Advisor ID is required.",
+      });
+      return;
+    }
+
+    const { name, email, gender, type, phone_number, location, working_hours } =
+      req.body;
+
+    if (!name || typeof name !== "string") {
+      res.status(400).json({
+        message: "Advisor name is required.",
+      });
+      return;
+    }
+
+    if (!email || typeof email !== "string") {
+      res.status(400).json({
+        message: "Advisor email is required.",
+      });
+      return;
+    }
+
+    if (!gender) {
+      res.status(400).json({
+        message: "Advisor gender is required.",
+      });
+      return;
+    }
+
+    if (!type) {
+      res.status(400).json({
+        message: "Advisor type is required.",
+      });
+      return;
+    }
+
+    if (!phone_number || typeof phone_number !== "string") {
+      res.status(400).json({
+        message: "Phone number is required.",
+      });
+      return;
+    }
+
+    if (!location || typeof location !== "string") {
+      res.status(400).json({
+        message: "Location is required.",
+      });
+      return;
+    }
+
+    if (
+      !working_hours ||
+      typeof working_hours !== "object" ||
+      !working_hours.start ||
+      !working_hours.end
+    ) {
+      res.status(400).json({
+        message: "Working hours are required.",
+      });
+      return;
+    }
+
+    const normalizedAdvisorId = advisor_id.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const advisor = await Advisor.findOne({
+      advisor_id: normalizedAdvisorId,
+    });
+
+    if (!advisor) {
+      res.status(404).json({
+        message: "Advisor not found.",
+      });
+      return;
+    }
+
+    const existingAdvisor = await Advisor.findOne({
+      email: normalizedEmail,
+      _id: { $ne: advisor._id },
+    });
+
+    if (existingAdvisor) {
+      res.status(409).json({
+        message: "Another advisor with this email already exists.",
+      });
+      return;
+    }
+
+    advisor.name = name.trim();
+    advisor.email = normalizedEmail;
+    advisor.gender = gender;
+    advisor.type = type;
+    advisor.phone_number = phone_number.trim();
+    advisor.location = location.trim();
+    advisor.working_hours = {
+      start: working_hours.start,
+      end: working_hours.end,
+    };
+
+    await advisor.save();
+
+    res.status(200).json({
+      message: "Advisor updated successfully.",
+      advisor: {
+        id: advisor._id,
+        advisor_id: advisor.advisor_id,
+        name: advisor.name,
+        email: advisor.email,
+        gender: advisor.gender,
+        type: advisor.type,
+        phone_number: advisor.phone_number,
+        location: advisor.location,
+        working_hours: advisor.working_hours,
+        active: advisor.active,
+      },
+    });
+  } catch (error) {
+    console.error("Update advisor error:", error);
+
+    res.status(500).json({
+      message: "Failed to update advisor.",
+    });
+  }
+};

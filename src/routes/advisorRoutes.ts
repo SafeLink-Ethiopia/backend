@@ -8,6 +8,11 @@ import {
   forgotAdvisorPassword,
   verifyAdvisorResetOtp,
   resetAdvisorPassword,
+  getAllAdvisors,
+  toggleAdvisorActive,
+  deleteAdvisor,
+  getAdvisorById,
+  updateAdvisor,
 } from "../controllers/advisorController";
 
 import { adminAuthMiddleware } from "../middleware/adminAuthMiddleware";
@@ -48,5 +53,11 @@ router.post("/verify-reset-otp", verifyAdvisorResetOtp);
 
 // Reset password
 router.post("/reset-password", resetAdvisorPassword);
+
+router.get("/", adminAuthMiddleware, getAllAdvisors);
+router.patch("/:advisor_id/active", adminAuthMiddleware, toggleAdvisorActive);
+router.delete("/:advisor_id", adminAuthMiddleware, deleteAdvisor);
+router.get("/:advisor_id", adminAuthMiddleware, getAdvisorById);
+router.patch("/:advisor_id", adminAuthMiddleware, updateAdvisor);
 
 export default router;
