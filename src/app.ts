@@ -4,6 +4,10 @@ import cors from "cors";
 import sessionRoutes from "./routes/sessionRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import awarenessPostRoutes from "./routes/awarenessPostRoutes";
+
+import sessionRoutes from "./routes/sessionRoutes";
+import adminRoutes from "./routes/adminRoutes";
+import awarenessPostRoutes from "./routes/awarenessPostRoutes";
 import servicesRouter from "./routes/services";
 import conversationsRouter from "./routes/conversations";
 import advisorRoutes from "./routes/advisorRoutes";
