@@ -5,9 +5,13 @@ import sessionRoutes from "./routes/sessionRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import awarenessPostRoutes from "./routes/awarenessPostRoutes";
 
+import sessionRoutes from "./routes/sessionRoutes";
+import adminRoutes from "./routes/adminRoutes";
+import awarenessPostRoutes from "./routes/awarenessPostRoutes";
 import servicesRouter from "./routes/services";
 import conversationsRouter from "./routes/conversations";
 import advisorRoutes from "./routes/advisorRoutes";
+import advisorDashboardRoutes from "./routes/Advisordashboardroutes";
 
 const app = express();
 
@@ -25,10 +29,9 @@ app.get("/health", (_req, res) => {
 app.use("/api/services", servicesRouter);
 app.use("/api/conversations", conversationsRouter);
 app.use("/session", sessionRoutes);
-
-app.use("/api/admin", adminRoutes);
-
-app.use("/api/admin/awareness-posts", awarenessPostRoutes);
+app.use("/api/advisor", advisorRoutes);
 app.use("/api/advisors", advisorRoutes);
-
+app.use("/api/admin", adminRoutes);
+app.use("/api/admin/awareness-posts", awarenessPostRoutes);
+app.use("/api/advisor-portal", advisorDashboardRoutes);
 export default app;
