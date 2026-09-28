@@ -6,6 +6,11 @@ import { Server } from "socket.io";
 
 import app from "./app";
 import connectDB from "./config/db";
+import awarenessRoutes from "./routes/awarenessRoutes";
+import facilitiesRouter from "./routes/facilities";
+
+
+app.use("/api/facilities", facilitiesRouter);
 import AdminAdvisorConversation from "./models/AdminAdvisorConversation";
 
 dotenv.config();
