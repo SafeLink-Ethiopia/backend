@@ -3,6 +3,7 @@ import { AdminRequest } from "../middleware/adminAuthMiddleware";
 import bcrypt from "bcryptjs";
 import { Admin } from "../models/Admin";
 import jwt from "jsonwebtoken";
+
 // POST /api/admin/setup
 export const createAdmin = async (
   req: Request,

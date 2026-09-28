@@ -11,6 +11,8 @@ import awarenessPostRoutes from "./routes/awarenessPostRoutes";
 import servicesRouter from "./routes/services";
 import conversationsRouter from "./routes/conversations";
 import advisorRoutes from "./routes/advisorRoutes";
+import adminDashboardRoutes from "./routes/adminDashboard";
+import adminAdvisorConversationRoutes from "./routes/adminAdvisorConversationRoutes";
 import advisorDashboardRoutes from "./routes/Advisordashboardroutes";
 
 const app = express();
@@ -33,5 +35,9 @@ app.use("/api/advisor", advisorRoutes);
 app.use("/api/advisors", advisorRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/awareness-posts", awarenessPostRoutes);
+app.use("/api/advisors", advisorRoutes);
+app.use("/api/admin/dashboard", adminDashboardRoutes);
+app.use("/api/admin-advisor-conversations", adminAdvisorConversationRoutes);
+
 app.use("/api/advisor-portal", advisorDashboardRoutes);
 export default app;
