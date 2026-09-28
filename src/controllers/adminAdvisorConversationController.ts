@@ -80,6 +80,7 @@ export const getAdminConversations = async (
 
     const conversations = await AdminAdvisorConversation.find({
       admin_id,
+      deletedForAdmin: { $ne: true },
     }).sort({
       updatedAt: -1,
     });

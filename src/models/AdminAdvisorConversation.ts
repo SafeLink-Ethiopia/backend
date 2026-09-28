@@ -5,13 +5,25 @@ export interface IAdminAdvisorMessage {
   sender: "admin" | "advisor";
   text: string;
   timestamp: Date;
+
+  edited?: boolean;
+  deleted?: boolean;
+
+  deliveredAt?: Date;
+  readAt?: Date;
 }
 
 export interface IAdminAdvisorConversation extends Document {
   conversation_id: string;
   admin_id: string;
   advisor_id: string;
+
+  // Hide the conversation from one side without deleting it
+  deletedForAdmin?: boolean;
+  deletedForAdvisor?: boolean;
+
   messages: IAdminAdvisorMessage[];
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,20 +35,41 @@ const messageSchema = new Schema<IAdminAdvisorMessage>(
       required: true,
       trim: true,
     },
+
     sender: {
       type: String,
       enum: ["admin", "advisor"],
       required: true,
     },
+
     text: {
       type: String,
       required: true,
       trim: true,
     },
+
     timestamp: {
       type: Date,
       default: Date.now,
       required: true,
+    },
+
+    edited: {
+      type: Boolean,
+      default: false,
+    },
+
+    deleted: {
+      type: Boolean,
+      default: false,
+    },
+
+    deliveredAt: {
+      type: Date,
+    },
+
+    readAt: {
+      type: Date,
     },
   },
   {
@@ -53,18 +86,31 @@ const adminAdvisorConversationSchema = new Schema<IAdminAdvisorConversation>(
       index: true,
       trim: true,
     },
+
     admin_id: {
       type: String,
       required: true,
       index: true,
       trim: true,
     },
+
     advisor_id: {
       type: String,
       required: true,
       index: true,
       trim: true,
     },
+
+    deletedForAdmin: {
+      type: Boolean,
+      default: false,
+    },
+
+    deletedForAdvisor: {
+      type: Boolean,
+      default: false,
+    },
+
     messages: {
       type: [messageSchema],
       default: [],
