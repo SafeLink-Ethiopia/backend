@@ -1,5 +1,5 @@
 import { Router } from "express";
-
+import * as advisorController from "../controllers/advisorController";
 import {
   createAdvisor,
   loginAdvisor,
@@ -14,44 +14,25 @@ import {
   getAdvisorById,
   updateAdvisor,
 } from "../controllers/advisorController";
-
 import { adminAuthMiddleware } from "../middleware/adminAuthMiddleware";
-
 import { advisorAuthMiddleware } from "../middleware/advisorAuthMiddleware";
 
 const router = Router();
 
-// =====================================================
-// ADMIN ROUTES
-// =====================================================
-
-// Admin creates an advisor
+router.post("/request", advisorController.requestAdvisor);
+router.get("/conversations", advisorController.getConversations);
+router.get("/conversation/:id", advisorController.getConversation);
+router.post("/conversation/:id/message", advisorController.postMessage);
+router.patch("/conversation/:id/message/:index", advisorController.patchMessage);
+router.post("/conversation/:id/clear", advisorController.postClear);
+router.delete("/conversation/:id", advisorController.deleteConversation);
+router.post("/conversation/:id/suggest", advisorController.postSuggest);
 router.post("/", adminAuthMiddleware, createAdvisor);
-
-// =====================================================
-// ADVISOR AUTHENTICATION ROUTES
-// =====================================================
-
-// Advisor login
 router.post("/login", loginAdvisor);
-
-// Advisor changes password
 router.post("/change-password", advisorAuthMiddleware, changeAdvisorPassword);
-
-// Advisor logout
 router.post("/logout", advisorAuthMiddleware, logoutAdvisor);
-
-// =====================================================
-// FORGOT PASSWORD ROUTES
-// =====================================================
-
-// Request password reset OTP
 router.post("/forgot-password", forgotAdvisorPassword);
-
-// Verify password reset OTP
 router.post("/verify-reset-otp", verifyAdvisorResetOtp);
-
-// Reset password
 router.post("/reset-password", resetAdvisorPassword);
 
 router.get("/", adminAuthMiddleware, getAllAdvisors);
