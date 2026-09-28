@@ -38,7 +38,7 @@ export interface IConversation extends Document {
   suggested_advisor_types: AdvisorType[];
 }
 
-const messageSchema = new Schema<IMessage>(
+const MessageSchema = new Schema<IMessage>(
   {
     message_id: {
       type: String,
