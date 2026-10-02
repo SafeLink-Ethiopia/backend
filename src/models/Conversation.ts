@@ -157,7 +157,7 @@ const conversationSchema = new Schema<IConversation>({
   },
 
   messages: {
-    type: [messageSchema],
+    type: [MessageSchema],
     default: [],
   },
 
