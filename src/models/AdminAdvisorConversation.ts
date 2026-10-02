@@ -7,7 +7,18 @@ export interface IAdminAdvisorMessage {
   timestamp: Date;
 
   edited?: boolean;
+
+  // Kept for backward compatibility with existing messages
   deleted?: boolean;
+
+  // Delete only for the admin who deleted the message
+  deletedForAdmin?: boolean;
+
+  // Delete only for the advisor who deleted the message
+  deletedForAdvisor?: boolean;
+
+  // Delete for everyone in the conversation
+  deletedForEveryone?: boolean;
 
   deliveredAt?: Date;
   readAt?: Date;
@@ -18,7 +29,8 @@ export interface IAdminAdvisorConversation extends Document {
   admin_id: string;
   advisor_id: string;
 
-  // Hide the conversation from one side without deleting it
+  // Hide the whole conversation from one side without
+  // deleting the conversation or its messages from MongoDB.
   deletedForAdmin?: boolean;
   deletedForAdvisor?: boolean;
 
@@ -42,6 +54,16 @@ const messageSchema = new Schema<IAdminAdvisorMessage>(
       required: true,
     },
 
+    /*
+     * IMPORTANT:
+     * We keep the original text in MongoDB.
+     *
+     * When a message is deleted for everyone, we will NOT replace
+     * this value with "This message was deleted".
+     *
+     * The frontend will display "This message was deleted" based
+     * on deletedForEveryone.
+     */
     text: {
       type: String,
       required: true,
@@ -59,7 +81,41 @@ const messageSchema = new Schema<IAdminAdvisorMessage>(
       default: false,
     },
 
+    /*
+     * Kept for compatibility with your existing database records.
+     *
+     * New code should use:
+     * - deletedForAdmin
+     * - deletedForAdvisor
+     * - deletedForEveryone
+     */
     deleted: {
+      type: Boolean,
+      default: false,
+    },
+
+    /*
+     * Message is hidden only from Admin.
+     */
+    deletedForAdmin: {
+      type: Boolean,
+      default: false,
+    },
+
+    /*
+     * Message is hidden only from Advisor.
+     */
+    deletedForAdvisor: {
+      type: Boolean,
+      default: false,
+    },
+
+    /*
+     * Message is deleted for both Admin and Advisor.
+     *
+     * The original text remains stored in MongoDB.
+     */
+    deletedForEveryone: {
       type: Boolean,
       default: false,
     },
@@ -101,11 +157,19 @@ const adminAdvisorConversationSchema = new Schema<IAdminAdvisorConversation>(
       trim: true,
     },
 
+    /*
+     * Hides the entire conversation only from Admin.
+     * The MongoDB conversation remains.
+     */
     deletedForAdmin: {
       type: Boolean,
       default: false,
     },
 
+    /*
+     * Hides the entire conversation only from Advisor.
+     * The MongoDB conversation remains.
+     */
     deletedForAdvisor: {
       type: Boolean,
       default: false,
@@ -122,6 +186,9 @@ const adminAdvisorConversationSchema = new Schema<IAdminAdvisorConversation>(
   },
 );
 
+/*
+ * One Admin ↔ Advisor conversation.
+ */
 adminAdvisorConversationSchema.index(
   { admin_id: 1, advisor_id: 1 },
   { unique: true },

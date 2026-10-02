@@ -27,6 +27,10 @@ export const getOrCreateAdminAdvisorConversation = async (
       return;
     }
 
+    /*
+     * Find the advisor so we can return the real advisor name
+     * to the frontend.
+     */
     const advisor = await Advisor.findOne({
       advisor_id: advisor_id.trim(),
     }).select("advisor_id name email active");
@@ -38,11 +42,17 @@ export const getOrCreateAdminAdvisorConversation = async (
       return;
     }
 
+    /*
+     * Find the existing Admin ↔ Advisor conversation.
+     */
     let conversation = await AdminAdvisorConversation.findOne({
       admin_id,
       advisor_id: advisor.advisor_id,
     });
 
+    /*
+     * Create the conversation if it doesn't exist.
+     */
     if (!conversation) {
       conversation = await AdminAdvisorConversation.create({
         conversation_id: `AAC-${crypto.randomUUID()}`,
@@ -52,8 +62,22 @@ export const getOrCreateAdminAdvisorConversation = async (
       });
     }
 
+    /*
+     * Return both the conversation and advisor information.
+     *
+     * The frontend can now display:
+     * "Usman"
+     * instead of:
+     * "Advisor"
+     */
     res.status(200).json({
       conversation,
+      advisor: {
+        advisor_id: advisor.advisor_id,
+        name: advisor.name,
+        email: advisor.email,
+        active: advisor.active,
+      },
     });
   } catch (error) {
     console.error("Get or create admin advisor conversation error:", error);
@@ -78,15 +102,66 @@ export const getAdminConversations = async (
       return;
     }
 
+    /*
+     * Get conversations belonging to this Admin.
+     */
     const conversations = await AdminAdvisorConversation.find({
       admin_id,
       deletedForAdmin: { $ne: true },
-    }).sort({
-      updatedAt: -1,
-    });
+    })
+      .sort({
+        updatedAt: -1,
+      })
+      .lean();
+
+    /*
+     * Get the advisors belonging to these conversations.
+     *
+     * advisor_id is stored as a string in the conversation model,
+     * so we fetch the corresponding Advisor documents separately.
+     */
+    const advisorIds = [
+      ...new Set(conversations.map((conversation) => conversation.advisor_id)),
+    ];
+
+    const advisors = await Advisor.find({
+      advisor_id: {
+        $in: advisorIds,
+      },
+    }).select("advisor_id name email active");
+
+    /*
+     * Create a quick lookup map:
+     *
+     * advisor_id -> advisor information
+     */
+    const advisorMap = new Map(
+      advisors.map((advisor) => [
+        advisor.advisor_id,
+        {
+          advisor_id: advisor.advisor_id,
+          name: advisor.name,
+          email: advisor.email,
+          active: advisor.active,
+        },
+      ]),
+    );
+
+    /*
+     * Add advisor information to every conversation.
+     */
+    const conversationsWithAdvisor = conversations.map((conversation) => ({
+      ...conversation,
+      advisor: advisorMap.get(conversation.advisor_id) ?? {
+        advisor_id: conversation.advisor_id,
+        name: conversation.advisor_id,
+        email: "",
+        active: false,
+      },
+    }));
 
     res.status(200).json({
-      conversations,
+      conversations: conversationsWithAdvisor,
     });
   } catch (error) {
     console.error("Get admin conversations error:", error);
@@ -119,6 +194,10 @@ export const getAdminAdvisorConversation = async (
       return;
     }
 
+    /*
+     * Find the conversation and make sure it belongs
+     * to the currently authenticated Admin.
+     */
     const conversation = await AdminAdvisorConversation.findOne({
       conversation_id: conversation_id.trim(),
       admin_id,
@@ -131,8 +210,31 @@ export const getAdminAdvisorConversation = async (
       return;
     }
 
+    /*
+     * Get the advisor's current information.
+     */
+    const advisor = await Advisor.findOne({
+      advisor_id: conversation.advisor_id,
+    }).select("advisor_id name email active");
+
+    if (!advisor) {
+      res.status(404).json({
+        message: "Advisor associated with this conversation was not found.",
+      });
+      return;
+    }
+
+    /*
+     * Return advisor information along with the conversation.
+     */
     res.status(200).json({
       conversation,
+      advisor: {
+        advisor_id: advisor.advisor_id,
+        name: advisor.name,
+        email: advisor.email,
+        active: advisor.active,
+      },
     });
   } catch (error) {
     console.error("Get admin advisor conversation error:", error);

@@ -81,13 +81,17 @@ io.on("connection", (socket) => {
         edited: false,
         deleted: false,
 
+        deletedForAdmin: false,
+        deletedForAdvisor: false,
+        deletedForEveryone: false,
+
         deliveredAt: new Date(),
       };
 
       conversation.messages.push(message);
 
-      // Make conversation visible again for both sides
-      // when a new message is sent.
+      // A new message makes the conversation visible again
+      // for both sides.
       conversation.deletedForAdmin = false;
       conversation.deletedForAdvisor = false;
 
@@ -153,7 +157,7 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Only the original sender can edit.
+      // Only the original sender can edit their own message.
       if (message.sender !== data.sender) {
         socket.emit("message_error", {
           message: "You can only edit your own messages.",
@@ -161,8 +165,8 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Deleted messages cannot be edited.
-      if (message.deleted) {
+      // A message deleted for everyone cannot be edited.
+      if (message.deleted || message.deletedForEveryone) {
         socket.emit("message_error", {
           message: "Deleted messages cannot be edited.",
         });
@@ -189,10 +193,20 @@ io.on("connection", (socket) => {
 
   // ============================================
   // DELETE MESSAGE
+  //
+  // deleteType:
+  // "me"       -> Delete only for the current user
+  // "everyone" -> Delete for both users
   // ============================================
   socket.on("delete_message", async (data) => {
     try {
-      if (!data || !data.conversation_id || !data.message_id || !data.sender) {
+      if (
+        !data ||
+        !data.conversation_id ||
+        !data.message_id ||
+        !data.sender ||
+        !data.deleteType
+      ) {
         socket.emit("message_error", {
           message: "Invalid delete data.",
         });
@@ -202,6 +216,13 @@ io.on("connection", (socket) => {
       if (data.sender !== "admin" && data.sender !== "advisor") {
         socket.emit("message_error", {
           message: "Invalid sender.",
+        });
+        return;
+      }
+
+      if (data.deleteType !== "me" && data.deleteType !== "everyone") {
+        socket.emit("message_error", {
+          message: "Invalid delete type.",
         });
         return;
       }
@@ -228,7 +249,7 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Only the original sender can delete.
+      // Only the original sender can delete their own message.
       if (message.sender !== data.sender) {
         socket.emit("message_error", {
           message: "You can only delete your own messages.",
@@ -236,18 +257,58 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Soft delete.
-      // The message stays in MongoDB.
-      message.text = "This message was deleted";
-      message.deleted = true;
-      message.edited = false;
+      // ==========================================
+      // DELETE FOR ME
+      // ==========================================
+      if (data.deleteType === "me") {
+        if (data.sender === "admin") {
+          message.deletedForAdmin = true;
+        }
 
-      await conversation.save();
+        if (data.sender === "advisor") {
+          message.deletedForAdvisor = true;
+        }
 
-      io.to(data.conversation_id).emit("message_deleted", {
-        conversation_id: data.conversation_id,
-        message_id: data.message_id,
-      });
+        await conversation.save();
+
+        // Only the user who requested "Delete for me"
+        // receives this event.
+        socket.emit("message_deleted_for_me", {
+          conversation_id: data.conversation_id,
+          message_id: data.message_id,
+        });
+
+        return;
+      }
+
+      // ==========================================
+      // DELETE FOR EVERYONE
+      // ==========================================
+      if (data.deleteType === "everyone") {
+        // IMPORTANT:
+        // Do NOT change message.text.
+        //
+        // The original message stays in MongoDB.
+        // The frontend will display:
+        // "This message was deleted"
+        // based on deletedForEveryone.
+        message.deletedForEveryone = true;
+
+        // Keep old field for backward compatibility.
+        message.deleted = true;
+
+        message.edited = false;
+
+        await conversation.save();
+
+        // Both admin and advisor receive the event.
+        io.to(data.conversation_id).emit("message_deleted_for_everyone", {
+          conversation_id: data.conversation_id,
+          message_id: data.message_id,
+        });
+
+        return;
+      }
     } catch (error) {
       console.error("Delete message error:", error);
 

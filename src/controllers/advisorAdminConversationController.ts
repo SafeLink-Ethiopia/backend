@@ -19,7 +19,8 @@ export const getAdvisorConversation = async (
 
     const conversation = await AdminAdvisorConversation.findOne({
       advisor_id,
-    });
+      deletedForAdvisor: { $ne: true },
+    }).lean();
 
     if (!conversation) {
       res.status(404).json({
@@ -28,8 +29,23 @@ export const getAdvisorConversation = async (
       return;
     }
 
+    /*
+     * Remove messages that the Advisor deleted only for themselves.
+     *
+     * Messages deleted for everyone remain in the response because
+     * the frontend needs to display:
+     *
+     * "This message was deleted"
+     */
+    const filteredConversation = {
+      ...conversation,
+      messages: conversation.messages.filter(
+        (message) => !message.deletedForAdvisor,
+      ),
+    };
+
     res.status(200).json({
-      conversation,
+      conversation: filteredConversation,
     });
   } catch (error) {
     console.error("Get advisor conversation error:", error);
@@ -56,12 +72,28 @@ export const getAdvisorConversations = async (
 
     const conversations = await AdminAdvisorConversation.find({
       advisor_id,
-    }).sort({
-      updatedAt: -1,
-    });
+      deletedForAdvisor: { $ne: true },
+    })
+      .sort({
+        updatedAt: -1,
+      })
+      .lean();
+
+    /*
+     * Hide messages that were deleted only for this Advisor.
+     *
+     * Messages deleted for everyone are kept so the UI can show
+     * the deleted-message placeholder.
+     */
+    const filteredConversations = conversations.map((conversation) => ({
+      ...conversation,
+      messages: conversation.messages.filter(
+        (message) => !message.deletedForAdvisor,
+      ),
+    }));
 
     res.status(200).json({
-      conversations,
+      conversations: filteredConversations,
     });
   } catch (error) {
     console.error("Get advisor conversations error:", error);
