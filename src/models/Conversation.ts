@@ -1,10 +1,7 @@
 import mongoose, { Document, Schema } from "mongoose";
+import { randomUUID } from "crypto";
 
-export type AdvisorType =
-  | "medical"
-  | "legal"
-  | "psychological"
-  | "general";
+export type AdvisorType = "medical" | "legal" | "psychological" | "general";
 
 export interface IMessage {
   message_id: string;
@@ -40,9 +37,10 @@ export interface IConversation extends Document {
 
 const MessageSchema = new Schema<IMessage>(
   {
+    // CHANGED: every new message now gets an id automatically.
     message_id: {
       type: String,
-      required: false,
+      default: () => randomUUID(),
     },
 
     sender: {
@@ -77,7 +75,7 @@ const MessageSchema = new Schema<IMessage>(
       default: null,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const recommendationSchema = new Schema<IRecommendation>(
@@ -102,12 +100,14 @@ const recommendationSchema = new Schema<IRecommendation>(
       required: true,
     },
 
+    // CHANGED: notes is optional now (an empty note should not fail the save).
     notes: {
       type: String,
-      required: true,
+      required: false,
+      default: "",
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const conversationSchema = new Schema<IConversation>({
@@ -129,12 +129,7 @@ const conversationSchema = new Schema<IConversation>({
 
   advisor_type: {
     type: String,
-    enum: [
-      "medical",
-      "legal",
-      "psychological",
-      "general",
-    ],
+    enum: ["medical", "legal", "psychological", "general"],
     default: "medical",
   },
 
@@ -147,10 +142,12 @@ const conversationSchema = new Schema<IConversation>({
     type: Boolean,
     default: false,
   },
+
   hidden_for_advisor: {
-  type: Boolean,
-  default: false,
-},
+    type: Boolean,
+    default: false,
+  },
+
   created_at: {
     type: Date,
     default: Date.now,
@@ -168,19 +165,18 @@ const conversationSchema = new Schema<IConversation>({
 
   suggested_advisor_types: {
     type: [String],
-    enum: [
-      "medical",
-      "legal",
-      "psychological",
-      "general",
-    ],
+    enum: ["medical", "legal", "psychological", "general"],
     default: [],
   },
 });
+
+// CHANGED: indexes so the dashboard queries stay fast.
+conversationSchema.index({ session_id: 1, hidden_for_user: 1 });
+conversationSchema.index({ advisor_id: 1, hidden_for_advisor: 1 });
 
 export default mongoose.models.Conversation ||
   mongoose.model<IConversation>(
     "Conversation",
     conversationSchema,
-    "conversations"
+    "conversations",
   );
