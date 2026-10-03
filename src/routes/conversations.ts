@@ -1,79 +1,434 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import Conversation from "../models/Conversation";
 
 const router = Router();
 
-/**
- * POST /api/conversations/request/medical
- *
- * Creates a new medical-support conversation.
- */
-router.post(
-  "/request/medical",
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { session_id } = req.body;
+const createMessageId = () =>
+  `MSG-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 
-      if (!session_id) {
-        res.status(400).json({
-          success: false,
-          message: "session_id is required",
-        });
-        return;
+const normalizeMessages = (
+  conversation: any
+): boolean => {
+  let changed = false;
+
+  conversation.messages.forEach(
+    (message: {
+      message_id?: string;
+      deleted?: boolean;
+      deleted_at?: Date | null;
+    }) => {
+      if (!message.message_id) {
+        message.message_id = createMessageId();
+        changed = true;
       }
 
-      const conversationId = `CONV-${Date.now()}`;
+      if (message.deleted === undefined) {
+        message.deleted = false;
+        changed = true;
+      }
 
-      const conversation = await Conversation.create({
-        conversation_id: conversationId,
-        session_id,
-        advisor_id: "ADV-MED-001",
-        messages: [],
-        recommendation: null,
-      });
+      if (message.deleted_at === undefined) {
+        message.deleted_at = null;
+        changed = true;
+      }
+    }
+  );
 
-      res.status(201).json({
-        success: true,
-        message: "Medical conversation created",
-        conversation,
-      });
-    } catch (error) {
-      console.error("Error creating medical conversation:", error);
+  return changed;
+};
 
-      res.status(500).json({
+/*
+ * DELETE /:id/messages
+ *
+ * Soft-clears the entire conversation.
+ */
+router.delete("/:id/messages", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const conversation = await Conversation.findOne({
+      conversation_id: id,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
         success: false,
-        message: "Failed to create medical conversation",
+        message: "Conversation not found",
       });
     }
+
+    normalizeMessages(conversation);
+
+    conversation.messages.forEach(
+      (message: {
+        deleted: boolean;
+        deleted_at?: Date | null;
+      }) => {
+        message.deleted = true;
+        message.deleted_at = new Date();
+      }
+    );
+
+    conversation.urgent = false;
+
+    await conversation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Conversation messages soft-deleted",
+      conversation,
+    });
+  } catch (error) {
+    console.error("Clear conversation error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to clear conversation",
+    });
   }
-);
+});
 
-/**
- * POST /api/conversations/:id/message
- *
- * Adds a user or advisor message to a conversation.
+/*
+ * POST /request/medical
  */
-router.post(
-  "/:id/message",
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const { sender, text } = req.body;
+router.post("/request/medical", async (req, res) => {
+  try {
+    const { session_id } = req.body;
 
-      if (!sender || !text) {
-        res.status(400).json({
-          success: false,
-          message: "sender and text are required",
-        });
-        return;
+    if (!session_id || typeof session_id !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "session_id is required",
+      });
+    }
+
+    const existingConversation = await Conversation.findOne({
+      session_id,
+      recommendation: null,
+    }).sort({ created_at: -1 });
+
+    if (existingConversation) {
+      const changed = normalizeMessages(
+        existingConversation
+      );
+
+      if (changed) {
+        await existingConversation.save();
       }
 
-      if (sender !== "user" && sender !== "advisor") {
-        res.status(400).json({
+      return res.status(200).json({
+        success: true,
+        message: "Existing medical conversation found",
+        conversation: existingConversation,
+      });
+    }
+
+    const conversation = await Conversation.create({
+      conversation_id: `CONV-${Date.now()}`,
+      session_id,
+      advisor_id: "ADV-MED-001",
+      advisor_type: "medical",
+      urgent: false,
+      hidden_for_user: false,
+      created_at: new Date(),
+      messages: [],
+      recommendation: null,
+      suggested_advisor_types: [],
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Medical support conversation created",
+      conversation,
+    });
+  } catch (error) {
+    console.error("Request medical support error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create medical support conversation",
+    });
+  }
+});
+
+/*
+ * POST /request
+ */
+router.post("/request", async (req, res) => {
+  try {
+    const { session_id, advisor_type } = req.body;
+
+    const allowedTypes = [
+      "medical",
+      "legal",
+      "psychological",
+      "general",
+    ];
+
+    if (!session_id || typeof session_id !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "session_id is required",
+      });
+    }
+
+    if (
+      !advisor_type ||
+      !allowedTypes.includes(advisor_type)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "advisor_type must be medical, legal, psychological, or general",
+      });
+    }
+
+    const advisorIds: Record<string, string> = {
+      medical: "ADV-MED-001",
+      legal: "ADV-LEGAL-001",
+      psychological: "ADV-PSY-001",
+      general: "ADV-GEN-001",
+    };
+
+    const conversation = await Conversation.create({
+      conversation_id: `CONV-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 6)}`,
+      session_id,
+      advisor_id: advisorIds[advisor_type],
+      advisor_type,
+      urgent: false,
+      hidden_for_user: false,
+      created_at: new Date(),
+      messages: [],
+      recommendation: null,
+      suggested_advisor_types: [],
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `${advisor_type} advisor conversation created`,
+      conversation,
+    });
+  } catch (error) {
+    console.error("Request advisor error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create advisor conversation",
+    });
+  }
+});
+
+/*
+ * GET /pending
+ */
+router.get("/pending", async (_req, res) => {
+  try {
+    const conversations = await Conversation.find({
+      recommendation: null,
+      hidden_for_advisor: false,
+    }).sort({ created_at: -1 });
+
+    let changed = false;
+
+    conversations.forEach((conversation) => {
+      if (normalizeMessages(conversation)) {
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      await Promise.all(
+        conversations.map((conversation) =>
+          conversation.save()
+        )
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      conversations,
+    });
+  } catch (error) {
+    console.error("Get pending conversations error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load pending conversations",
+    });
+  }
+});
+
+/*
+ * GET /session/:session_id
+ */
+router.get("/session/:session_id", async (req, res) => {
+  try {
+    const { session_id } = req.params;
+
+    const conversation = await Conversation.findOne({
+      session_id,
+      hidden_for_user: false,
+    }).sort({ created_at: -1 });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "No conversation found for this session",
+      });
+    }
+
+    if (normalizeMessages(conversation)) {
+      await conversation.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      conversation,
+    });
+  } catch (error) {
+    console.error(
+      "Get conversation by session error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load conversation",
+    });
+  }
+});
+
+/*
+ * GET /:id
+ */
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const conversation = await Conversation.findOne({
+      conversation_id: id,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    if (normalizeMessages(conversation)) {
+      await conversation.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      conversation,
+    });
+  } catch (error) {
+    console.error("Get conversation error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load conversation",
+    });
+  }
+});
+
+/*
+ * POST /:id/message
+ */
+router.post("/:id/message", async (req, res) => {
+  try {
+    const { sender, text, urgent } = req.body;
+    const { id } = req.params;
+
+    if (sender !== "user" && sender !== "advisor") {
+      return res.status(400).json({
+        success: false,
+        message: "sender must be either user or advisor",
+      });
+    }
+
+    if (
+      !text ||
+      typeof text !== "string" ||
+      !text.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Message text is required",
+      });
+    }
+
+    const conversation = await Conversation.findOne({
+      conversation_id: id,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    normalizeMessages(conversation);
+
+    conversation.messages.push({
+      message_id: createMessageId(),
+      sender,
+      text: text.trim(),
+      timestamp: new Date(),
+      edited: false,
+      deleted: false,
+      deleted_at: null,
+    });
+
+    if (sender === "user" && urgent === true) {
+      conversation.urgent = true;
+    }
+
+    await conversation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Message added",
+      conversation,
+    });
+  } catch (error) {
+    console.error("Add message error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add message",
+    });
+  }
+});
+
+/*
+ * PATCH /:id/message/:messageId
+ *
+ * Edit a message.
+ */
+router.patch(
+  "/:id/message/:messageId",
+  async (req, res) => {
+    try {
+      const { id, messageId } = req.params;
+      const { text } = req.body;
+
+      if (
+        !text ||
+        typeof text !== "string" ||
+        !text.trim()
+      ) {
+        return res.status(400).json({
           success: false,
-          message: 'sender must be either "user" or "advisor"',
+          message: "Message text is required",
         });
-        return;
       }
 
       const conversation = await Conversation.findOne({
@@ -81,137 +436,337 @@ router.post(
       });
 
       if (!conversation) {
-        res.status(404).json({
+        return res.status(404).json({
           success: false,
           message: "Conversation not found",
         });
-        return;
       }
 
-      conversation.messages.push({
-        sender,
-        text,
-        timestamp: new Date(),
-      });
+      normalizeMessages(conversation);
+
+      const message = conversation.messages.find(
+        (item: {
+          message_id: string;
+          deleted: boolean;
+        }) => item.message_id === messageId
+      );
+
+      if (!message) {
+        return res.status(404).json({
+          success: false,
+          message: "Message not found",
+        });
+      }
+
+      if (message.deleted) {
+        return res.status(400).json({
+          success: false,
+          message: "Deleted messages cannot be edited",
+        });
+      }
+
+      message.text = text.trim();
+      message.edited = true;
 
       await conversation.save();
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
-        message: "Message added",
+        message: "Message edited",
         conversation,
       });
     } catch (error) {
-      console.error("Error adding message:", error);
+      console.error("Edit message error:", error);
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        message: "Failed to add message",
+        message: "Failed to edit message",
       });
     }
   }
 );
 
-/**
- * GET /api/conversations/:id
+/*
+ * DELETE /:id/message/:messageId
  *
- * Retrieves a complete conversation.
+ * Soft-delete one message.
  */
-router.get(
-  "/:id",
-  async (req: Request, res: Response): Promise<void> => {
+router.delete(
+  "/:id/message/:messageId",
+  async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id, messageId } = req.params;
 
       const conversation = await Conversation.findOne({
         conversation_id: id,
       });
 
       if (!conversation) {
-        res.status(404).json({
+        return res.status(404).json({
           success: false,
           message: "Conversation not found",
         });
-        return;
       }
 
-      res.status(200).json({
-        success: true,
-        conversation,
-      });
-    } catch (error) {
-      console.error("Error fetching conversation:", error);
+      normalizeMessages(conversation);
 
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch conversation",
-      });
-    }
-  }
-);
+      const message = conversation.messages.find(
+        (item: {
+          message_id: string;
+          deleted: boolean;
+          deleted_at?: Date | null;
+        }) => item.message_id === messageId
+      );
 
-/**
- * POST /api/conversations/:id/recommend
- *
- * Adds or updates the medical facility recommendation.
- */
-router.post(
-  "/:id/recommend",
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { id } = req.params;
-
-      const {
-        facility_name,
-        location,
-        contact,
-        notes,
-      } = req.body;
-
-      if (!facility_name || !location || !contact || !notes) {
-        res.status(400).json({
+      if (!message) {
+        return res.status(404).json({
           success: false,
-          message:
-            "facility_name, location, contact, and notes are required",
+          message: "Message not found",
         });
-        return;
       }
 
-      const conversation = await Conversation.findOne({
-        conversation_id: id,
-      });
-
-      if (!conversation) {
-        res.status(404).json({
-          success: false,
-          message: "Conversation not found",
-        });
-        return;
-      }
-
-      conversation.recommendation = {
-        facility_name,
-        location,
-        contact,
-        notes,
-      };
+      message.deleted = true;
+      message.deleted_at = new Date();
 
       await conversation.save();
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
-        message: "Medical facility recommendation added",
+        message: "Message soft-deleted",
         conversation,
       });
     } catch (error) {
-      console.error("Error adding recommendation:", error);
+      console.error("Delete message error:", error);
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        message: "Failed to add recommendation",
+        message: "Failed to delete message",
       });
     }
   }
 );
+
+/*
+ * DELETE /:id/messages/bulk
+ *
+ * Soft-delete multiple messages.
+ */
+router.delete(
+  "/:id/messages/bulk",
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { message_ids } = req.body;
+
+      if (
+        !Array.isArray(message_ids) ||
+        message_ids.length === 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "message_ids must be a non-empty array",
+        });
+      }
+
+      const conversation = await Conversation.findOne({
+        conversation_id: id,
+      });
+
+      if (!conversation) {
+        return res.status(404).json({
+          success: false,
+          message: "Conversation not found",
+        });
+      }
+
+      normalizeMessages(conversation);
+
+      const ids = new Set(message_ids);
+
+      conversation.messages.forEach(
+        (message: {
+          message_id: string;
+          deleted: boolean;
+          deleted_at?: Date | null;
+        }) => {
+          if (ids.has(message.message_id)) {
+            message.deleted = true;
+            message.deleted_at = new Date();
+          }
+        }
+      );
+
+      await conversation.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Selected messages soft-deleted",
+        conversation,
+      });
+    } catch (error) {
+      console.error(
+        "Bulk delete messages error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to delete selected messages",
+      });
+    }
+  }
+);
+
+/*
+ * DELETE /chats/bulk
+ *
+ * Soft-hide multiple conversations from the advisor.
+ */
+router.delete("/chats/bulk", async (req, res) => {
+  try {
+    const { conversation_ids } = req.body;
+
+    if (
+      !Array.isArray(conversation_ids) ||
+      conversation_ids.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "conversation_ids must be a non-empty array",
+      });
+    }
+
+    const result = await Conversation.updateMany(
+      {
+        conversation_id: { $in: conversation_ids },
+      },
+      {
+        $set: {
+          hidden_for_advisor: true,
+        },
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Selected chats deleted for advisor",
+      deleted_count: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error("Bulk delete chats error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete selected chats",
+    });
+  }
+});
+/*
+ * DELETE /:id/advisor
+ *
+ * Hide a conversation from the advisor's conversation list.
+ * The user's conversation remains intact.
+ */
+router.delete("/:id/advisor", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const conversation = await Conversation.findOne({
+      conversation_id: id,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    conversation.hidden_for_advisor = true;
+
+    await conversation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Conversation removed from advisor list",
+      conversation,
+    });
+  } catch (error) {
+    console.error(
+      "Delete advisor conversation error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to remove conversation from advisor list",
+    });
+  }
+});
+/*
+ * POST /:id/recommend
+ */
+router.post("/:id/recommend", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      facility_id,
+      facility_name,
+      location,
+      contact,
+      notes,
+    } = req.body;
+
+    if (
+      !facility_id ||
+      !facility_name ||
+      !location ||
+      !contact ||
+      !notes
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "facility_id, facility_name, location, contact and notes are required",
+      });
+    }
+
+    const conversation = await Conversation.findOne({
+      conversation_id: id,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    conversation.recommendation = {
+      facility_id,
+      facility_name,
+      location,
+      contact,
+      notes,
+    };
+
+    await conversation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Facility recommendation saved",
+      conversation,
+    });
+  } catch (error) {
+    console.error("Recommend facility error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save facility recommendation",
+    });
+  }
+});
 
 export default router;

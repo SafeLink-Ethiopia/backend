@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export type AdvisorType = "medical" | "legal" | "psychological" | "general";
-export type AdvisorGender = "male" | "female";
+export type AdvisorGender = "male" | "female" ;
 export interface IAdvisor extends Document {
   advisor_id: string;
   type: AdvisorType;
@@ -14,9 +14,9 @@ export interface IAdvisor extends Document {
   passwordHash: string;
   working_hours: {
     start: string; // "09:00"
-    end: string; // "17:00"
+    end: string;   // "17:00"
   };
-  mustChangePassword: boolean;
+   mustChangePassword: boolean;
 
   resetOtpHash?: string | null;
   resetOtpExpires?: Date | null;
@@ -24,7 +24,7 @@ export interface IAdvisor extends Document {
 
   resetTokenHash?: string | null;
   resetTokenExpires?: Date | null;
-  createdAt: Date;
+   createdAt: Date;
   updatedAt: Date;
 }
 

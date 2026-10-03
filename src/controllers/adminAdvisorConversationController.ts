@@ -2,6 +2,7 @@ import { Response } from "express";
 import crypto from "crypto";
 
 import { AdminRequest } from "../middleware/adminAuthMiddleware";
+import { AdvisorRequest } from "../middleware/advisorAuthMiddleware";
 import AdminAdvisorConversation from "../models/AdminAdvisorConversation";
 import Advisor from "../models/Advisor";
 
@@ -27,10 +28,6 @@ export const getOrCreateAdminAdvisorConversation = async (
       return;
     }
 
-    /*
-     * Find the advisor so we can return the real advisor name
-     * to the frontend.
-     */
     const advisor = await Advisor.findOne({
       advisor_id: advisor_id.trim(),
     }).select("advisor_id name email active");
@@ -42,17 +39,11 @@ export const getOrCreateAdminAdvisorConversation = async (
       return;
     }
 
-    /*
-     * Find the existing Admin ↔ Advisor conversation.
-     */
     let conversation = await AdminAdvisorConversation.findOne({
       admin_id,
       advisor_id: advisor.advisor_id,
     });
 
-    /*
-     * Create the conversation if it doesn't exist.
-     */
     if (!conversation) {
       conversation = await AdminAdvisorConversation.create({
         conversation_id: `AAC-${crypto.randomUUID()}`,
@@ -62,22 +53,8 @@ export const getOrCreateAdminAdvisorConversation = async (
       });
     }
 
-    /*
-     * Return both the conversation and advisor information.
-     *
-     * The frontend can now display:
-     * "Usman"
-     * instead of:
-     * "Advisor"
-     */
     res.status(200).json({
       conversation,
-      advisor: {
-        advisor_id: advisor.advisor_id,
-        name: advisor.name,
-        email: advisor.email,
-        active: advisor.active,
-      },
     });
   } catch (error) {
     console.error("Get or create admin advisor conversation error:", error);
@@ -194,10 +171,6 @@ export const getAdminAdvisorConversation = async (
       return;
     }
 
-    /*
-     * Find the conversation and make sure it belongs
-     * to the currently authenticated Admin.
-     */
     const conversation = await AdminAdvisorConversation.findOne({
       conversation_id: conversation_id.trim(),
       admin_id,

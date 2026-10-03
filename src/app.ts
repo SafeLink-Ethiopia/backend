@@ -55,16 +55,9 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/admin/dashboard", adminDashboardRoutes);
 
 app.use("/api/admin/awareness-posts", awarenessPostRoutes);
-
-// =========================
-// Admin ↔ Advisor Chat
-// =========================
-
+app.use("/api/advisors", advisorRoutes);
+app.use("/api/admin/dashboard", adminDashboardRoutes);
 app.use("/api/admin-advisor-conversations", adminAdvisorConversationRoutes);
-
-// =========================
-// Advisor Portal
-// =========================
 
 app.use("/api/advisor-portal", advisorDashboardRoutes);
 app.use("/api/advisor-conversations", advisorConversationRoutes);

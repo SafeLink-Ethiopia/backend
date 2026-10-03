@@ -16,9 +16,23 @@ import {
 } from "../controllers/advisorController";
 import { adminAuthMiddleware } from "../middleware/adminAuthMiddleware";
 import { advisorAuthMiddleware } from "../middleware/advisorAuthMiddleware";
+import {
+  getAdvisorAdminConversation,
+  getAdvisorAdminConversations,
+} from "../controllers/adminAdvisorConversationController";
 
 const router = Router();
 
+router.get(
+  "/admin-conversations",
+  advisorAuthMiddleware,
+  getAdvisorAdminConversations,
+);
+router.get(
+  "/admin-conversations/:conversation_id",
+  advisorAuthMiddleware,
+  getAdvisorAdminConversation,
+);
 router.post("/request", advisorController.requestAdvisor);
 router.get("/conversations", advisorController.getConversations);
 router.get("/conversation/:id", advisorController.getConversation);
