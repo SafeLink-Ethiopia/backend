@@ -10,11 +10,11 @@ import advisorRoutes from "./routes/advisorRoutes";
 import adminDashboardRoutes from "./routes/adminDashboard";
 import adminAdvisorConversationRoutes from "./routes/adminAdvisorConversationRoutes";
 import advisorDashboardRoutes from "./routes/Advisordashboardroutes";
+import facilitiesRouter from "./routes/facilities";
 
 const app = express();
 
 app.use(cors());
-
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
@@ -26,14 +26,19 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/services", servicesRouter);
 app.use("/api/conversations", conversationsRouter);
+
+app.use("/api/facilities", facilitiesRouter);
+
 app.use("/session", sessionRoutes);
+
 app.use("/api/advisor", advisorRoutes);
 app.use("/api/advisors", advisorRoutes);
+
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/awareness-posts", awarenessPostRoutes);
-app.use("/api/advisors", advisorRoutes);
+
 app.use("/api/admin/dashboard", adminDashboardRoutes);
 app.use("/api/admin-advisor-conversations", adminAdvisorConversationRoutes);
-
 app.use("/api/advisor-portal", advisorDashboardRoutes);
+
 export default app;
