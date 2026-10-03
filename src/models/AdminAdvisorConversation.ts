@@ -5,13 +5,37 @@ export interface IAdminAdvisorMessage {
   sender: "admin" | "advisor";
   text: string;
   timestamp: Date;
+
+  edited?: boolean;
+
+  // Kept for backward compatibility with existing messages
+  deleted?: boolean;
+
+  // Delete only for the admin who deleted the message
+  deletedForAdmin?: boolean;
+
+  // Delete only for the advisor who deleted the message
+  deletedForAdvisor?: boolean;
+
+  // Delete for everyone in the conversation
+  deletedForEveryone?: boolean;
+
+  deliveredAt?: Date;
+  readAt?: Date;
 }
 
 export interface IAdminAdvisorConversation extends Document {
   conversation_id: string;
   admin_id: string;
   advisor_id: string;
+
+  // Hide the whole conversation from one side without
+  // deleting the conversation or its messages from MongoDB.
+  deletedForAdmin?: boolean;
+  deletedForAdvisor?: boolean;
+
   messages: IAdminAdvisorMessage[];
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +89,25 @@ const adminAdvisorConversationSchema = new Schema<IAdminAdvisorConversation>(
       index: true,
       trim: true,
     },
+
+    /*
+     * Hides the entire conversation only from Admin.
+     * The MongoDB conversation remains.
+     */
+    deletedForAdmin: {
+      type: Boolean,
+      default: false,
+    },
+
+    /*
+     * Hides the entire conversation only from Advisor.
+     * The MongoDB conversation remains.
+     */
+    deletedForAdvisor: {
+      type: Boolean,
+      default: false,
+    },
+
     messages: {
       type: [messageSchema],
       default: [],

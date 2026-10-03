@@ -10,6 +10,8 @@ import advisorRoutes from "./routes/advisorRoutes";
 import adminDashboardRoutes from "./routes/adminDashboard";
 import adminAdvisorConversationRoutes from "./routes/adminAdvisorConversationRoutes";
 import advisorDashboardRoutes from "./routes/Advisordashboardroutes";
+import advisorConversationRoutes from "./routes/advisorConversationRoutes";
+import advisorAdminConversationRoutes from "./routes/advisorAdminConversationRoutes";
 
 const app = express();
 
@@ -24,16 +26,41 @@ app.get("/health", (_req, res) => {
   });
 });
 
+// =========================
+// General APIs
+// =========================
+
 app.use("/api/services", servicesRouter);
 app.use("/api/conversations", conversationsRouter);
+
+// =========================
+// Session APIs
+// =========================
+
 app.use("/session", sessionRoutes);
+
+// =========================
+// Advisor APIs
+// =========================
+
 app.use("/api/advisor", advisorRoutes);
 app.use("/api/advisors", advisorRoutes);
+
+// =========================
+// Admin APIs
+// =========================
+
 app.use("/api/admin", adminRoutes);
+
+app.use("/api/admin/dashboard", adminDashboardRoutes);
+
 app.use("/api/admin/awareness-posts", awarenessPostRoutes);
 app.use("/api/advisors", advisorRoutes);
 app.use("/api/admin/dashboard", adminDashboardRoutes);
 app.use("/api/admin-advisor-conversations", adminAdvisorConversationRoutes);
 
 app.use("/api/advisor-portal", advisorDashboardRoutes);
+app.use("/api/advisor-conversations", advisorConversationRoutes);
+app.use("/api/advisor-admin-conversations", advisorAdminConversationRoutes);
+
 export default app;
