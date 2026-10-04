@@ -1,16 +1,14 @@
+```ts
 import { Router } from "express";
 import Conversation from "../models/Conversation";
+import Advisor from "../models/Advisor";
 
 const router = Router();
 
 const createMessageId = () =>
-  `MSG-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  `MSG-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-const normalizeMessages = (
-  conversation: any
-): boolean => {
+const normalizeMessages = (conversation: any): boolean => {
   let changed = false;
 
   conversation.messages.forEach(
@@ -33,7 +31,7 @@ const normalizeMessages = (
         message.deleted_at = null;
         changed = true;
       }
-    }
+    },
   );
 
   return changed;
@@ -62,13 +60,10 @@ router.delete("/:id/messages", async (req, res) => {
     normalizeMessages(conversation);
 
     conversation.messages.forEach(
-      (message: {
-        deleted: boolean;
-        deleted_at?: Date | null;
-      }) => {
+      (message: { deleted: boolean; deleted_at?: Date | null }) => {
         message.deleted = true;
         message.deleted_at = new Date();
-      }
+      },
     );
 
     conversation.urgent = false;
@@ -110,9 +105,7 @@ router.post("/request/medical", async (req, res) => {
     }).sort({ created_at: -1 });
 
     if (existingConversation) {
-      const changed = normalizeMessages(
-        existingConversation
-      );
+      const changed = normalizeMessages(existingConversation);
 
       if (changed) {
         await existingConversation.save();
@@ -160,12 +153,7 @@ router.post("/request", async (req, res) => {
   try {
     const { session_id, advisor_type } = req.body;
 
-    const allowedTypes = [
-      "medical",
-      "legal",
-      "psychological",
-      "general",
-    ];
+    const allowedTypes = ["medical", "legal", "psychological", "general"];
 
     if (!session_id || typeof session_id !== "string") {
       return res.status(400).json({
@@ -174,10 +162,7 @@ router.post("/request", async (req, res) => {
       });
     }
 
-    if (
-      !advisor_type ||
-      !allowedTypes.includes(advisor_type)
-    ) {
+    if (!advisor_type || !allowedTypes.includes(advisor_type)) {
       return res.status(400).json({
         success: false,
         message:
@@ -185,19 +170,24 @@ router.post("/request", async (req, res) => {
       });
     }
 
-    const advisorIds: Record<string, string> = {
-      medical: "ADV-MED-001",
-      legal: "ADV-LEGAL-001",
-      psychological: "ADV-PSY-001",
-      general: "ADV-GEN-001",
-    };
+    const advisor = await Advisor.findOne({
+      type: advisor_type,
+      active: true,
+    });
+
+    if (!advisor) {
+      return res.status(404).json({
+        success: false,
+        message: `No active ${advisor_type} advisor is available`,
+      });
+    }
 
     const conversation = await Conversation.create({
       conversation_id: `CONV-${Date.now()}-${Math.random()
         .toString(36)
         .slice(2, 6)}`,
       session_id,
-      advisor_id: advisorIds[advisor_type],
+      advisor_id: advisor.advisor_id,
       advisor_type,
       urgent: false,
       hidden_for_user: false,
@@ -242,9 +232,7 @@ router.get("/pending", async (_req, res) => {
 
     if (changed) {
       await Promise.all(
-        conversations.map((conversation) =>
-          conversation.save()
-        )
+        conversations.map((conversation) => conversation.save()),
       );
     }
 
@@ -290,10 +278,7 @@ router.get("/session/:session_id", async (req, res) => {
       conversation,
     });
   } catch (error) {
-    console.error(
-      "Get conversation by session error:",
-      error
-    );
+    console.error("Get conversation by session error:", error);
 
     return res.status(500).json({
       success: false,
@@ -353,11 +338,7 @@ router.post("/:id/message", async (req, res) => {
       });
     }
 
-    if (
-      !text ||
-      typeof text !== "string" ||
-      !text.trim()
-    ) {
+    if (!text || typeof text !== "string" || !text.trim()) {
       return res.status(400).json({
         success: false,
         message: "Message text is required",
@@ -413,209 +394,188 @@ router.post("/:id/message", async (req, res) => {
  *
  * Edit a message.
  */
-router.patch(
-  "/:id/message/:messageId",
-  async (req, res) => {
-    try {
-      const { id, messageId } = req.params;
-      const { text } = req.body;
+router.patch("/:id/message/:messageId", async (req, res) => {
+  try {
+    const { id, messageId } = req.params;
+    const { text } = req.body;
 
-      if (
-        !text ||
-        typeof text !== "string" ||
-        !text.trim()
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Message text is required",
-        });
-      }
-
-      const conversation = await Conversation.findOne({
-        conversation_id: id,
-      });
-
-      if (!conversation) {
-        return res.status(404).json({
-          success: false,
-          message: "Conversation not found",
-        });
-      }
-
-      normalizeMessages(conversation);
-
-      const message = conversation.messages.find(
-        (item: {
-          message_id: string;
-          deleted: boolean;
-        }) => item.message_id === messageId
-      );
-
-      if (!message) {
-        return res.status(404).json({
-          success: false,
-          message: "Message not found",
-        });
-      }
-
-      if (message.deleted) {
-        return res.status(400).json({
-          success: false,
-          message: "Deleted messages cannot be edited",
-        });
-      }
-
-      message.text = text.trim();
-      message.edited = true;
-
-      await conversation.save();
-
-      return res.status(200).json({
-        success: true,
-        message: "Message edited",
-        conversation,
-      });
-    } catch (error) {
-      console.error("Edit message error:", error);
-
-      return res.status(500).json({
+    if (!text || typeof text !== "string" || !text.trim()) {
+      return res.status(400).json({
         success: false,
-        message: "Failed to edit message",
+        message: "Message text is required",
       });
     }
+
+    const conversation = await Conversation.findOne({
+      conversation_id: id,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    normalizeMessages(conversation);
+
+    const message = conversation.messages.find(
+      (item: { message_id: string; deleted: boolean }) =>
+        item.message_id === messageId,
+    );
+
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: "Message not found",
+      });
+    }
+
+    if (message.deleted) {
+      return res.status(400).json({
+        success: false,
+        message: "Deleted messages cannot be edited",
+      });
+    }
+
+    message.text = text.trim();
+    message.edited = true;
+
+    await conversation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Message edited",
+      conversation,
+    });
+  } catch (error) {
+    console.error("Edit message error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to edit message",
+    });
   }
-);
+});
 
 /*
  * DELETE /:id/message/:messageId
  *
  * Soft-delete one message.
  */
-router.delete(
-  "/:id/message/:messageId",
-  async (req, res) => {
-    try {
-      const { id, messageId } = req.params;
+router.delete("/:id/message/:messageId", async (req, res) => {
+  try {
+    const { id, messageId } = req.params;
 
-      const conversation = await Conversation.findOne({
-        conversation_id: id,
-      });
+    const conversation = await Conversation.findOne({
+      conversation_id: id,
+    });
 
-      if (!conversation) {
-        return res.status(404).json({
-          success: false,
-          message: "Conversation not found",
-        });
-      }
-
-      normalizeMessages(conversation);
-
-      const message = conversation.messages.find(
-        (item: {
-          message_id: string;
-          deleted: boolean;
-          deleted_at?: Date | null;
-        }) => item.message_id === messageId
-      );
-
-      if (!message) {
-        return res.status(404).json({
-          success: false,
-          message: "Message not found",
-        });
-      }
-
-      message.deleted = true;
-      message.deleted_at = new Date();
-
-      await conversation.save();
-
-      return res.status(200).json({
-        success: true,
-        message: "Message soft-deleted",
-        conversation,
-      });
-    } catch (error) {
-      console.error("Delete message error:", error);
-
-      return res.status(500).json({
+    if (!conversation) {
+      return res.status(404).json({
         success: false,
-        message: "Failed to delete message",
+        message: "Conversation not found",
       });
     }
+
+    normalizeMessages(conversation);
+
+    const message = conversation.messages.find(
+      (item: {
+        message_id: string;
+        deleted: boolean;
+        deleted_at?: Date | null;
+      }) => item.message_id === messageId,
+    );
+
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: "Message not found",
+      });
+    }
+
+    message.deleted = true;
+    message.deleted_at = new Date();
+
+    await conversation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Message soft-deleted",
+      conversation,
+    });
+  } catch (error) {
+    console.error("Delete message error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete message",
+    });
   }
-);
+});
 
 /*
  * DELETE /:id/messages/bulk
  *
  * Soft-delete multiple messages.
  */
-router.delete(
-  "/:id/messages/bulk",
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { message_ids } = req.body;
+router.delete("/:id/messages/bulk", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message_ids } = req.body;
 
-      if (
-        !Array.isArray(message_ids) ||
-        message_ids.length === 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "message_ids must be a non-empty array",
-        });
-      }
-
-      const conversation = await Conversation.findOne({
-        conversation_id: id,
-      });
-
-      if (!conversation) {
-        return res.status(404).json({
-          success: false,
-          message: "Conversation not found",
-        });
-      }
-
-      normalizeMessages(conversation);
-
-      const ids = new Set(message_ids);
-
-      conversation.messages.forEach(
-        (message: {
-          message_id: string;
-          deleted: boolean;
-          deleted_at?: Date | null;
-        }) => {
-          if (ids.has(message.message_id)) {
-            message.deleted = true;
-            message.deleted_at = new Date();
-          }
-        }
-      );
-
-      await conversation.save();
-
-      return res.status(200).json({
-        success: true,
-        message: "Selected messages soft-deleted",
-        conversation,
-      });
-    } catch (error) {
-      console.error(
-        "Bulk delete messages error:",
-        error
-      );
-
-      return res.status(500).json({
+    if (!Array.isArray(message_ids) || message_ids.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Failed to delete selected messages",
+        message: "message_ids must be a non-empty array",
       });
     }
+
+    const conversation = await Conversation.findOne({
+      conversation_id: id,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    normalizeMessages(conversation);
+
+    const ids = new Set(message_ids);
+
+    conversation.messages.forEach(
+      (message: {
+        message_id: string;
+        deleted: boolean;
+        deleted_at?: Date | null;
+      }) => {
+        if (ids.has(message.message_id)) {
+          message.deleted = true;
+          message.deleted_at = new Date();
+        }
+      },
+    );
+
+    await conversation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Selected messages soft-deleted",
+      conversation,
+    });
+  } catch (error) {
+    console.error("Bulk delete messages error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete selected messages",
+    });
   }
-);
+});
 
 /*
  * DELETE /chats/bulk
@@ -626,10 +586,7 @@ router.delete("/chats/bulk", async (req, res) => {
   try {
     const { conversation_ids } = req.body;
 
-    if (
-      !Array.isArray(conversation_ids) ||
-      conversation_ids.length === 0
-    ) {
+    if (!Array.isArray(conversation_ids) || conversation_ids.length === 0) {
       return res.status(400).json({
         success: false,
         message: "conversation_ids must be a non-empty array",
@@ -644,7 +601,7 @@ router.delete("/chats/bulk", async (req, res) => {
         $set: {
           hidden_for_advisor: true,
         },
-      }
+      },
     );
 
     return res.status(200).json({
@@ -661,6 +618,7 @@ router.delete("/chats/bulk", async (req, res) => {
     });
   }
 });
+
 /*
  * DELETE /:id/advisor
  *
@@ -692,18 +650,15 @@ router.delete("/:id/advisor", async (req, res) => {
       conversation,
     });
   } catch (error) {
-    console.error(
-      "Delete advisor conversation error:",
-      error
-    );
+    console.error("Delete advisor conversation error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to remove conversation from advisor list",
+      message: "Failed to remove conversation from advisor list",
     });
   }
 });
+
 /*
  * POST /:id/recommend
  */
@@ -711,21 +666,9 @@ router.post("/:id/recommend", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const {
-      facility_id,
-      facility_name,
-      location,
-      contact,
-      notes,
-    } = req.body;
+    const { facility_id, facility_name, location, contact, notes } = req.body;
 
-    if (
-      !facility_id ||
-      !facility_name ||
-      !location ||
-      !contact ||
-      !notes
-    ) {
+    if (!facility_id || !facility_name || !location || !contact || !notes) {
       return res.status(400).json({
         success: false,
         message:
@@ -768,6 +711,7 @@ router.post("/:id/recommend", async (req, res) => {
     });
   }
 });
+
 /*
  * PATCH /:id/seen
  *
@@ -821,7 +765,7 @@ router.patch("/:id/seen", async (req, res) => {
         ) {
           message.seen_at = now;
         }
-      }
+      },
     );
 
     await conversation.save();
@@ -840,4 +784,6 @@ router.patch("/:id/seen", async (req, res) => {
     });
   }
 });
+
 export default router;
+```
