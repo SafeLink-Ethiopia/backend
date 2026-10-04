@@ -13,7 +13,7 @@ const router = Router();
 
 router.post("/", adminAuthMiddleware, createAwarenessPost);
 
-router.get("/", adminAuthMiddleware, getAwarenessPosts);
+router.get("/", getAwarenessPosts);
 
 router.put("/:id", adminAuthMiddleware, updateAwarenessPost);
 
