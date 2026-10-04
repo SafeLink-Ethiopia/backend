@@ -11,6 +11,7 @@ export interface IMessage {
   edited: boolean;
   deleted: boolean;
   deleted_at?: Date | null;
+    seen_at?: Date | null;
 }
 
 export interface IRecommendation {
@@ -71,6 +72,10 @@ const MessageSchema = new Schema<IMessage>(
     },
 
     deleted_at: {
+      type: Date,
+      default: null,
+    },
+        seen_at: {
       type: Date,
       default: null,
     },

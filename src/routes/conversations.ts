@@ -1,3 +1,4 @@
+```ts
 import { Router } from "express";
 import Conversation from "../models/Conversation";
 import Advisor from "../models/Advisor";
@@ -617,6 +618,7 @@ router.delete("/chats/bulk", async (req, res) => {
     });
   }
 });
+
 /*
  * DELETE /:id/advisor
  *
@@ -656,6 +658,7 @@ router.delete("/:id/advisor", async (req, res) => {
     });
   }
 });
+
 /*
  * POST /:id/recommend
  */
@@ -709,4 +712,78 @@ router.post("/:id/recommend", async (req, res) => {
   }
 });
 
+/*
+ * PATCH /:id/seen
+ *
+ * Marks every message from the OTHER party as seen (read receipt).
+ *
+ * - viewer = "advisor" → marks all `sender: "user"` messages as seen.
+ * - viewer = "user"    → marks all `sender: "advisor"` messages as seen.
+ *
+ * Idempotent: only sets seen_at if it's currently null.
+ */
+router.patch("/:id/seen", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { viewer } = req.body as {
+      viewer?: "user" | "advisor";
+    };
+
+    if (viewer !== "user" && viewer !== "advisor") {
+      return res.status(400).json({
+        success: false,
+        message: "viewer must be either 'user' or 'advisor'",
+      });
+    }
+
+    const conversation = await Conversation.findOne({
+      conversation_id: id,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    normalizeMessages(conversation);
+
+    const otherSender =
+      viewer === "advisor" ? "user" : "advisor";
+
+    const now = new Date();
+
+    conversation.messages.forEach(
+      (message: {
+        sender: "user" | "advisor";
+        seen_at?: Date | null;
+      }) => {
+        if (
+          message.sender === otherSender &&
+          !message.seen_at
+        ) {
+          message.seen_at = now;
+        }
+      },
+    );
+
+    await conversation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Messages marked as seen",
+      conversation,
+    });
+  } catch (error) {
+    console.error("Mark seen error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to mark messages as seen",
+    });
+  }
+});
+
 export default router;
+```
