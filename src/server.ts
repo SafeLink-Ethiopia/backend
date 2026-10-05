@@ -12,6 +12,13 @@ import facilitiesRouter from "./routes/facilities";
 app.use("/api/facilities", facilitiesRouter);
 import AdminAdvisorConversation from "./models/AdminAdvisorConversation";
 
+// User ↔ Advisor Socket.IO service
+import { setupUserAdvisorSocket } from "./services/userAdvisorSocket";
+
+// If you already have an Advisor ↔ User socket service,
+// import it here too.
+// import { setupAdvisorUserSocket } from "./services/advisorUserSocket";
+
 dotenv.config();
 
 dns.setServers(["8.8.8.8"]);
@@ -27,6 +34,28 @@ const io = new Server(httpServer, {
   },
 });
 
+// ============================================================
+// USER ↔ ADVISOR SOCKET
+// ============================================================
+// IMPORTANT:
+// This registers:
+// - user_advisor_join
+// - user_advisor_send_message
+// - user_advisor_message
+// - user_advisor_error
+// - disconnect handling
+//
+// It MUST use this same `io` instance.
+setupUserAdvisorSocket(io);
+
+// If your advisorUserSocket.ts exports setupAdvisorUserSocket,
+// uncomment these two lines:
+//
+// setupAdvisorUserSocket(io);
+
+// ============================================================
+// ADMIN ↔ ADVISOR SOCKET
+// ============================================================
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
 
@@ -161,7 +190,6 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Only the original sender can edit their own message.
       if (message.sender !== data.sender) {
         socket.emit("message_error", {
           message: "You can only edit your own messages.",
@@ -169,7 +197,6 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // A message deleted for everyone cannot be edited.
       if (message.deleted || message.deletedForEveryone) {
         socket.emit("message_error", {
           message: "Deleted messages cannot be edited.",
@@ -197,10 +224,6 @@ io.on("connection", (socket) => {
 
   // ============================================
   // DELETE MESSAGE
-  //
-  // deleteType:
-  // "me"       -> Delete only for the current user
-  // "everyone" -> Delete for both users
   // ============================================
   socket.on("delete_message", async (data) => {
     try {
@@ -253,7 +276,6 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Only the original sender can delete their own message.
       if (message.sender !== data.sender) {
         socket.emit("message_error", {
           message: "You can only delete your own messages.",
@@ -275,8 +297,6 @@ io.on("connection", (socket) => {
 
         await conversation.save();
 
-        // Only the user who requested "Delete for me"
-        // receives this event.
         socket.emit("message_deleted_for_me", {
           conversation_id: data.conversation_id,
           message_id: data.message_id,
@@ -289,23 +309,12 @@ io.on("connection", (socket) => {
       // DELETE FOR EVERYONE
       // ==========================================
       if (data.deleteType === "everyone") {
-        // IMPORTANT:
-        // Do NOT change message.text.
-        //
-        // The original message stays in MongoDB.
-        // The frontend will display:
-        // "This message was deleted"
-        // based on deletedForEveryone.
         message.deletedForEveryone = true;
-
-        // Keep old field for backward compatibility.
         message.deleted = true;
-
         message.edited = false;
 
         await conversation.save();
 
-        // Both admin and advisor receive the event.
         io.to(data.conversation_id).emit("message_deleted_for_everyone", {
           conversation_id: data.conversation_id,
           message_id: data.message_id,
@@ -351,9 +360,6 @@ io.on("connection", (socket) => {
         });
         return;
       }
-
-      // IMPORTANT:
-      // We DO NOT delete the MongoDB document.
 
       if (data.sender === "admin") {
         conversation.deletedForAdmin = true;
@@ -463,7 +469,6 @@ io.on("connection", (socket) => {
 // ============================================
 // START SERVER
 // ============================================
-
 const startServer = async () => {
   try {
     await connectDB();

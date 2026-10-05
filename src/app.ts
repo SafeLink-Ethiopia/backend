@@ -12,6 +12,8 @@ import adminAdvisorConversationRoutes from "./routes/adminAdvisorConversationRou
 import advisorDashboardRoutes from "./routes/Advisordashboardroutes";
 import advisorConversationRoutes from "./routes/advisorConversationRoutes";
 import advisorAdminConversationRoutes from "./routes/advisorAdminConversationRoutes";
+import userAdvisorConversationRoutes from "./routes/userAdvisorConversationRoutes";
+import advisorUserConversationRoutes from "./routes/advisorUserConversationRoutes";
 
 const app = express();
 
@@ -62,5 +64,7 @@ app.use("/api/admin-advisor-conversations", adminAdvisorConversationRoutes);
 app.use("/api/advisor-portal", advisorDashboardRoutes);
 app.use("/api/advisor-conversations", advisorConversationRoutes);
 app.use("/api/advisor-admin-conversations", advisorAdminConversationRoutes);
+app.use("/api/user-advisor-conversations", userAdvisorConversationRoutes);
+app.use("/api/advisor/user-conversations", advisorUserConversationRoutes);
 
 export default app;
