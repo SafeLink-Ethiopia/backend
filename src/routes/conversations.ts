@@ -1,4 +1,4 @@
-```ts
+
 import { Router } from "express";
 import Conversation from "../models/Conversation";
 import Advisor from "../models/Advisor";
@@ -786,4 +786,4 @@ router.patch("/:id/seen", async (req, res) => {
 });
 
 export default router;
-```
+
