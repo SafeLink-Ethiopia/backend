@@ -2,6 +2,8 @@
 import { Router } from "express";
 import Conversation from "../models/Conversation";
 import Advisor from "../models/Advisor";
+import { getMyConversations } from "../controllers/AdvisorDashboardController";
+import { advisorAuthMiddleware } from "../middleware/advisorAuthMiddleware";
 
 const router = Router();
 
@@ -215,40 +217,7 @@ router.post("/request", async (req, res) => {
 /*
  * GET /pending
  */
-router.get("/pending", async (_req, res) => {
-  try {
-    const conversations = await Conversation.find({
-      recommendation: null,
-      hidden_for_advisor: false,
-    }).sort({ created_at: -1 });
-
-    let changed = false;
-
-    conversations.forEach((conversation) => {
-      if (normalizeMessages(conversation)) {
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      await Promise.all(
-        conversations.map((conversation) => conversation.save()),
-      );
-    }
-
-    return res.status(200).json({
-      success: true,
-      conversations,
-    });
-  } catch (error) {
-    console.error("Get pending conversations error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load pending conversations",
-    });
-  }
-});
+router.get("/pending", advisorAuthMiddleware, getMyConversations);
 
 /*
  * GET /session/:session_id
@@ -786,4 +755,3 @@ router.patch("/:id/seen", async (req, res) => {
 });
 
 export default router;
-
