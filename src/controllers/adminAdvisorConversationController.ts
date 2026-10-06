@@ -55,6 +55,7 @@ export const getOrCreateAdminAdvisorConversation = async (
 
     res.status(200).json({
       conversation,
+      advisor,
     });
   } catch (error) {
     console.error("Get or create admin advisor conversation error:", error);
