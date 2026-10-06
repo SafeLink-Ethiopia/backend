@@ -10,15 +10,10 @@ import advisorRoutes from "./routes/advisorRoutes";
 import adminDashboardRoutes from "./routes/adminDashboard";
 import adminAdvisorConversationRoutes from "./routes/adminAdvisorConversationRoutes";
 import advisorDashboardRoutes from "./routes/Advisordashboardroutes";
-import advisorConversationRoutes from "./routes/advisorConversationRoutes";
-import advisorAdminConversationRoutes from "./routes/advisorAdminConversationRoutes";
-import userAdvisorConversationRoutes from "./routes/userAdvisorConversationRoutes";
-import advisorUserConversationRoutes from "./routes/advisorUserConversationRoutes";
 
 const app = express();
 
 app.use(cors());
-
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
@@ -28,43 +23,24 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// =========================
-// General APIs
-// =========================
-
 app.use("/api/services", servicesRouter);
-app.use("/api/conversations", conversationsRouter);
 
-// =========================
-// Session APIs
-// =========================
+app.use("/api/conversations", conversationsRouter);
 
 app.use("/session", sessionRoutes);
 
-// =========================
-// Advisor APIs
-// =========================
-
 app.use("/api/advisor", advisorRoutes);
-app.use("/api/advisors", advisorRoutes);
 
-// =========================
-// Admin APIs
-// =========================
+app.use("/api/advisors", advisorRoutes);
 
 app.use("/api/admin", adminRoutes);
 
+app.use("/api/admin/awareness-posts", awarenessPostRoutes);
+
 app.use("/api/admin/dashboard", adminDashboardRoutes);
 
-app.use("/api/admin/awareness-posts", awarenessPostRoutes);
-app.use("/api/advisors", advisorRoutes);
-app.use("/api/admin/dashboard", adminDashboardRoutes);
-app.use("/api/admin-advisor-conversations", adminAdvisorConversationRoutes);
+app.use("/api/advisor-admin-conversations", adminAdvisorConversationRoutes);
 
 app.use("/api/advisor-portal", advisorDashboardRoutes);
-app.use("/api/advisor-conversations", advisorConversationRoutes);
-app.use("/api/advisor-admin-conversations", advisorAdminConversationRoutes);
-app.use("/api/user-advisor-conversations", userAdvisorConversationRoutes);
-app.use("/api/advisor/user-conversations", advisorUserConversationRoutes);
 
 export default app;
