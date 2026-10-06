@@ -287,6 +287,49 @@ router.get("/session/:session_id", async (req, res) => {
   }
 });
 
+
+router.get("/session/:session_id/all", async (req, res) => {
+  try {
+    const { session_id } = req.params;
+
+    const conversations = await Conversation.find({
+      session_id,
+      hidden_for_user: false,
+    }).sort({ created_at: -1 });
+
+    let changed = false;
+
+    conversations.forEach((conversation) => {
+      if (normalizeMessages(conversation)) {
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      await Promise.all(
+        conversations.map((conversation) => conversation.save()),
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      conversations,
+    });
+  } catch (error) {
+    console.error(
+      "Get all conversations by session error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load conversations",
+    });
+  }
+});
+
+
+
 /*
  * GET /:id
  */
