@@ -255,6 +255,41 @@ router.get("/session/:session_id", async (req, res) => {
     });
   }
 });
+/*
+ * GET /session/:session_id/all
+ *
+ * Get all conversations belonging to a user session.
+ * Used by the user dashboard/chat to find conversations
+ * for different advisor types.
+ */
+router.get("/session/:session_id/all", async (req, res) => {
+  try {
+    const { session_id } = req.params;
+
+    const conversations = await Conversation.find({
+      session_id,
+      hidden_for_user: false,
+    }).sort({ created_at: -1 });
+
+    for (const conversation of conversations) {
+      if (normalizeMessages(conversation)) {
+        await conversation.save();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      conversations,
+    });
+  } catch (error) {
+    console.error("Get all conversations by session error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load conversations",
+    });
+  }
+});
 
 /*
  * GET /:id
