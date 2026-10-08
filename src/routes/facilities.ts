@@ -265,5 +265,185 @@ router.post(
     }
   },
 );
+/**
+ * PATCH /api/facilities/:facility_id
+ *
+ * Advisor only.
+ */
+router.patch(
+  "/:facility_id",
+  advisorAuthMiddleware,
+  async (req: AdvisorRequest, res) => {
+    try {
+      const { facility_id } = req.params;
 
+      const {
+        facility_name,
+        location,
+        contact,
+        support_types,
+        description,
+      } = req.body;
+
+      const facility = await Facility.findOne({ facility_id });
+
+      if (!facility) {
+        return res.status(404).json({
+          success: false,
+          message: "Facility not found",
+        });
+      }
+
+      if (
+        facility_name !== undefined &&
+        !facility_name?.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Facility name cannot be empty",
+        });
+      }
+
+      if (
+        location !== undefined &&
+        !location?.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Location cannot be empty",
+        });
+      }
+
+      if (
+        contact !== undefined &&
+        !contact?.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Contact cannot be empty",
+        });
+      }
+
+      if (
+        description !== undefined &&
+        !description?.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Description cannot be empty",
+        });
+      }
+
+      if (support_types !== undefined) {
+        if (
+          !Array.isArray(support_types) ||
+          support_types.length === 0
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "At least one support type is required",
+          });
+        }
+
+        const invalidType = support_types.some(
+          (type: string) =>
+            !SUPPORT_TYPES.includes(
+              type as (typeof SUPPORT_TYPES)[number],
+            ),
+        );
+
+        if (invalidType) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid support type",
+          });
+        }
+      }
+
+      if (facility_name !== undefined) {
+        facility.facility_name = facility_name.trim();
+      }
+
+      if (location !== undefined) {
+        facility.location = location.trim();
+      }
+
+      if (contact !== undefined) {
+        facility.contact = contact.trim();
+      }
+
+      if (support_types !== undefined) {
+        facility.support_types = support_types;
+      }
+
+      if (description !== undefined) {
+        facility.description = description.trim();
+      }
+
+      await facility.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Facility updated successfully",
+        facility: {
+          facility_id: facility.facility_id,
+          facility_name: facility.facility_name,
+          location: facility.location,
+          contact: facility.contact,
+          support_types: facility.support_types,
+          description:
+            facility.description || facility.notes || "",
+          added_by: facility.added_by || "",
+          created_at: facility.created_at,
+          updated_at: facility.updated_at,
+        },
+      });
+    } catch (error) {
+      console.error("Update facility error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update facility",
+      });
+    }
+  },
+);
+
+/**
+ * DELETE /api/facilities/:facility_id
+ *
+ * Advisor only.
+ */
+router.delete(
+  "/:facility_id",
+  advisorAuthMiddleware,
+  async (req: AdvisorRequest, res) => {
+    try {
+      const { facility_id } = req.params;
+
+      const facility = await Facility.findOne({ facility_id });
+
+      if (!facility) {
+        return res.status(404).json({
+          success: false,
+          message: "Facility not found",
+        });
+      }
+
+      await Facility.deleteOne({ facility_id });
+
+      return res.status(200).json({
+        success: true,
+        message: "Facility deleted successfully",
+      });
+    } catch (error) {
+      console.error("Delete facility error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to delete facility",
+      });
+    }
+  },
+);
 export default router;
