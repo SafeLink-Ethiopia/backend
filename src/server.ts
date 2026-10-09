@@ -81,6 +81,15 @@ io.on("connection", (socket) => {
         sender: data.sender,
         text: data.text.trim(),
         timestamp: new Date(),
+        ...(data.reply_to
+          ? {
+              replyTo: {
+                message_id: data.reply_to.message_id,
+                text: data.reply_to.text,
+                sender: data.reply_to.sender,
+              },
+            }
+          : {}),
 
         edited: false,
         deleted: false,

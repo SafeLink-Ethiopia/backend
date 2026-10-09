@@ -1,9 +1,14 @@
-import { Router } from "express";
+import { NextFunction, Request, Response, Router } from "express";
+import jwt from "jsonwebtoken";
 import Facility from "../models/Facility";
 import {
   advisorAuthMiddleware,
   AdvisorRequest,
 } from "../middleware/advisorAuthMiddleware";
+import {
+  adminAuthMiddleware,
+  AdminRequest,
+} from "../middleware/adminAuthMiddleware";
 
 const router = Router();
 
@@ -13,6 +18,29 @@ const SUPPORT_TYPES = [
   "psychological",
   "general",
 ] as const;
+
+const facilityManagerAuthMiddleware = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.substring(7)
+    : "";
+  const payload = token ? jwt.decode(token) : null;
+  const role =
+    typeof payload === "object" && payload !== null
+      ? payload.role
+      : undefined;
+
+  if (role === "admin") {
+    void adminAuthMiddleware(req, res, next);
+    return;
+  }
+
+  void advisorAuthMiddleware(req, res, next);
+};
 
 /**
  * GET /api/facilities
@@ -177,12 +205,12 @@ router.get("/:facility_id", async (req, res) => {
 /**
  * POST /api/facilities
  *
- * Advisor only.
+ * Admin or advisor only.
  */
 router.post(
   "/",
-  advisorAuthMiddleware,
-  async (req: AdvisorRequest, res) => {
+  facilityManagerAuthMiddleware,
+  async (req: AdvisorRequest & AdminRequest, res) => {
     try {
       const {
         facility_name,
@@ -237,7 +265,8 @@ router.post(
         contact: contact.trim(),
         support_types,
         description: description.trim(),
-        added_by: req.advisor?.advisor_id || "",
+        added_by:
+          req.advisor?.advisor_id || req.admin?.admin_id || "",
       });
 
       return res.status(201).json({
@@ -304,41 +333,44 @@ router.patch(
         });
       }
 
-      if (
-        location !== undefined &&
-        !location?.trim()
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Location cannot be empty",
-        });
+/**
+ * PATCH /api/facilities/:facility_id
+ *
+ * Admin or advisor only.
+ */
+router.patch(
+  "/:facility_id",
+  facilityManagerAuthMiddleware,
+  async (req: AdvisorRequest & AdminRequest, res) => {
+    try {
+      const {
+        facility_name,
+        location,
+        contact,
+        support_types,
+        description,
+      } = req.body;
+
+      const updateData: Record<string, unknown> = {};
+
+      if (typeof facility_name === "string" && facility_name.trim()) {
+        updateData.facility_name = facility_name.trim();
       }
 
-      if (
-        contact !== undefined &&
-        !contact?.trim()
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Contact cannot be empty",
-        });
+      if (typeof location === "string" && location.trim()) {
+        updateData.location = location.trim();
       }
 
-      if (
-        description !== undefined &&
-        !description?.trim()
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Description cannot be empty",
-        });
+      if (typeof contact === "string" && contact.trim()) {
+        updateData.contact = contact.trim();
+      }
+
+      if (typeof description === "string" && description.trim()) {
+        updateData.description = description.trim();
       }
 
       if (support_types !== undefined) {
-        if (
-          !Array.isArray(support_types) ||
-          support_types.length === 0
-        ) {
+        if (!Array.isArray(support_types) || support_types.length === 0) {
           return res.status(400).json({
             success: false,
             message: "At least one support type is required",
@@ -347,9 +379,7 @@ router.patch(
 
         const invalidType = support_types.some(
           (type: string) =>
-            !SUPPORT_TYPES.includes(
-              type as (typeof SUPPORT_TYPES)[number],
-            ),
+            !SUPPORT_TYPES.includes(type as (typeof SUPPORT_TYPES)[number]),
         );
 
         if (invalidType) {
@@ -358,29 +388,22 @@ router.patch(
             message: "Invalid support type",
           });
         }
+
+        updateData.support_types = support_types;
       }
 
-      if (facility_name !== undefined) {
-        facility.facility_name = facility_name.trim();
-      }
+      const facility = await Facility.findOneAndUpdate(
+        { facility_id: req.params.facility_id },
+        { $set: updateData },
+        { new: true },
+      );
 
-      if (location !== undefined) {
-        facility.location = location.trim();
+      if (!facility) {
+        return res.status(404).json({
+          success: false,
+          message: "Facility not found",
+        });
       }
-
-      if (contact !== undefined) {
-        facility.contact = contact.trim();
-      }
-
-      if (support_types !== undefined) {
-        facility.support_types = support_types;
-      }
-
-      if (description !== undefined) {
-        facility.description = description.trim();
-      }
-
-      await facility.save();
 
       return res.status(200).json({
         success: true,
@@ -390,7 +413,10 @@ router.patch(
           facility_name: facility.facility_name,
           location: facility.location,
           contact: facility.contact,
-          support_types: facility.support_types,
+          support_types:
+            facility.support_types?.length > 0
+              ? facility.support_types
+              : [],
           description:
             facility.description || facility.notes || "",
           added_by: facility.added_by || "",
@@ -412,16 +438,16 @@ router.patch(
 /**
  * DELETE /api/facilities/:facility_id
  *
- * Advisor only.
+ * Admin or advisor only.
  */
 router.delete(
   "/:facility_id",
-  advisorAuthMiddleware,
-  async (req: AdvisorRequest, res) => {
+  facilityManagerAuthMiddleware,
+  async (_req: AdvisorRequest & AdminRequest, res) => {
     try {
-      const { facility_id } = req.params;
-
-      const facility = await Facility.findOne({ facility_id });
+      const facility = await Facility.findOneAndDelete({
+        facility_id: _req.params.facility_id,
+      });
 
       if (!facility) {
         return res.status(404).json({
@@ -429,8 +455,6 @@ router.delete(
           message: "Facility not found",
         });
       }
-
-      await Facility.deleteOne({ facility_id });
 
       return res.status(200).json({
         success: true,
@@ -446,4 +470,5 @@ router.delete(
     }
   },
 );
+
 export default router;
