@@ -7,6 +7,11 @@ export interface IAdminAdvisorMessage {
   timestamp: Date;
 
   edited?: boolean;
+  replyTo?: {
+    message_id: string;
+    text: string;
+    sender: "admin" | "advisor";
+  };
 
   // Kept for backward compatibility with existing messages
   deleted?: boolean;
@@ -40,6 +45,18 @@ export interface IAdminAdvisorConversation extends Document {
   updatedAt: Date;
 }
 
+const replyToSchema = new Schema<IAdminAdvisorMessage["replyTo"]>(
+  {
+    message_id: String,
+    text: String,
+    sender: {
+      type: String,
+      enum: ["admin", "advisor"],
+    },
+  },
+  { _id: false },
+);
+
 const messageSchema = new Schema<IAdminAdvisorMessage>(
   {
     message_id: {
@@ -61,6 +78,10 @@ const messageSchema = new Schema<IAdminAdvisorMessage>(
       type: Date,
       default: Date.now,
       required: true,
+    },
+    replyTo: {
+      type: replyToSchema,
+      default: undefined,
     },
   },
   {

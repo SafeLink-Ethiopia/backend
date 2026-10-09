@@ -11,7 +11,10 @@ export interface IMessage {
   edited: boolean;
   deleted: boolean;
   deleted_at?: Date | null;
-    seen_at?: Date | null;
+  seen_at?: Date | null;
+
+  // Message this message is replying to
+  reply_to?: string | null;
 }
 
 export interface IRecommendation {
@@ -38,7 +41,7 @@ export interface IConversation extends Document {
 
 const MessageSchema = new Schema<IMessage>(
   {
-    // CHANGED: every new message now gets an id automatically.
+    // Every new message gets an id automatically.
     message_id: {
       type: String,
       default: () => randomUUID(),
@@ -75,8 +78,16 @@ const MessageSchema = new Schema<IMessage>(
       type: Date,
       default: null,
     },
-        seen_at: {
+
+    seen_at: {
       type: Date,
+      default: null,
+    },
+
+    // ID of the message being replied to.
+    // null means this is a normal message.
+    reply_to: {
+      type: String,
       default: null,
     },
   },
@@ -105,7 +116,7 @@ const recommendationSchema = new Schema<IRecommendation>(
       required: true,
     },
 
-    // CHANGED: notes is optional now (an empty note should not fail the save).
+    // Notes are optional.
     notes: {
       type: String,
       required: false,
@@ -175,7 +186,7 @@ const conversationSchema = new Schema<IConversation>({
   },
 });
 
-// CHANGED: indexes so the dashboard queries stay fast.
+// Indexes so dashboard queries stay fast.
 conversationSchema.index({ session_id: 1, hidden_for_user: 1 });
 conversationSchema.index({ advisor_id: 1, hidden_for_advisor: 1 });
 

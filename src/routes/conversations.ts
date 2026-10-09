@@ -1,7 +1,8 @@
-```ts
 import { Router } from "express";
 import Conversation from "../models/Conversation";
 import Advisor from "../models/Advisor";
+import { getMyConversations } from "../controllers/AdvisorDashboardController";
+import { advisorAuthMiddleware } from "../middleware/advisorAuthMiddleware";
 
 const router = Router();
 
@@ -16,6 +17,8 @@ const normalizeMessages = (conversation: any): boolean => {
       message_id?: string;
       deleted?: boolean;
       deleted_at?: Date | null;
+      seen_at?: Date | null;
+      reply_to?: string | null;
     }) => {
       if (!message.message_id) {
         message.message_id = createMessageId();
@@ -29,6 +32,16 @@ const normalizeMessages = (conversation: any): boolean => {
 
       if (message.deleted_at === undefined) {
         message.deleted_at = null;
+        changed = true;
+      }
+
+      if (message.seen_at === undefined) {
+        message.seen_at = null;
+        changed = true;
+      }
+
+      if (message.reply_to === undefined) {
+        message.reply_to = null;
         changed = true;
       }
     },
@@ -215,40 +228,7 @@ router.post("/request", async (req, res) => {
 /*
  * GET /pending
  */
-router.get("/pending", async (_req, res) => {
-  try {
-    const conversations = await Conversation.find({
-      recommendation: null,
-      hidden_for_advisor: false,
-    }).sort({ created_at: -1 });
-
-    let changed = false;
-
-    conversations.forEach((conversation) => {
-      if (normalizeMessages(conversation)) {
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      await Promise.all(
-        conversations.map((conversation) => conversation.save()),
-      );
-    }
-
-    return res.status(200).json({
-      success: true,
-      conversations,
-    });
-  } catch (error) {
-    console.error("Get pending conversations error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load pending conversations",
-    });
-  }
-});
+router.get("/pending", advisorAuthMiddleware, getMyConversations);
 
 /*
  * GET /session/:session_id
@@ -283,6 +263,42 @@ router.get("/session/:session_id", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to load conversation",
+    });
+  }
+});
+
+/*
+ * GET /session/:session_id/all
+ *
+ * Get all conversations belonging to a user session.
+ * Used by the user dashboard/chat to find conversations
+ * for different advisor types.
+ */
+router.get("/session/:session_id/all", async (req, res) => {
+  try {
+    const { session_id } = req.params;
+
+    const conversations = await Conversation.find({
+      session_id,
+      hidden_for_user: false,
+    }).sort({ created_at: -1 });
+
+    for (const conversation of conversations) {
+      if (normalizeMessages(conversation)) {
+        await conversation.save();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      conversations,
+    });
+  } catch (error) {
+    console.error("Get all conversations by session error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load conversations",
     });
   }
 });
@@ -325,10 +341,15 @@ router.get("/:id", async (req, res) => {
 
 /*
  * POST /:id/message
+ *
+ * Send a new message.
+ *
+ * Optional:
+ * reply_to - message_id of the message being replied to.
  */
 router.post("/:id/message", async (req, res) => {
   try {
-    const { sender, text, urgent } = req.body;
+    const { sender, text, urgent, reply_to } = req.body;
     const { id } = req.params;
 
     if (sender !== "user" && sender !== "advisor") {
@@ -345,6 +366,21 @@ router.post("/:id/message", async (req, res) => {
       });
     }
 
+    /*
+     * If reply_to was provided, it must be a valid
+     * message_id inside this conversation.
+     */
+    if (
+      reply_to !== undefined &&
+      reply_to !== null &&
+      typeof reply_to !== "string"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "reply_to must be a message id",
+      });
+    }
+
     const conversation = await Conversation.findOne({
       conversation_id: id,
     });
@@ -358,6 +394,30 @@ router.post("/:id/message", async (req, res) => {
 
     normalizeMessages(conversation);
 
+    /*
+     * Validate the message being replied to.
+     */
+    if (reply_to) {
+      const originalMessage = conversation.messages.find(
+        (message: { message_id: string; deleted: boolean }) =>
+          message.message_id === reply_to,
+      );
+
+      if (!originalMessage) {
+        return res.status(404).json({
+          success: false,
+          message: "Message being replied to was not found",
+        });
+      }
+
+      if (originalMessage.deleted) {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot reply to a deleted message",
+        });
+      }
+    }
+
     conversation.messages.push({
       message_id: createMessageId(),
       sender,
@@ -366,6 +426,8 @@ router.post("/:id/message", async (req, res) => {
       edited: false,
       deleted: false,
       deleted_at: null,
+      seen_at: null,
+      reply_to: reply_to ?? null,
     });
 
     if (sender === "user" && urgent === true) {
@@ -376,7 +438,7 @@ router.post("/:id/message", async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Message added",
+      message: reply_to ? "Reply added" : "Message added",
       conversation,
     });
   } catch (error) {
@@ -717,8 +779,8 @@ router.post("/:id/recommend", async (req, res) => {
  *
  * Marks every message from the OTHER party as seen (read receipt).
  *
- * - viewer = "advisor" → marks all `sender: "user"` messages as seen.
- * - viewer = "user"    → marks all `sender: "advisor"` messages as seen.
+ * - viewer = "advisor" → marks all user messages as seen.
+ * - viewer = "user"    → marks all advisor messages as seen.
  *
  * Idempotent: only sets seen_at if it's currently null.
  */
@@ -749,20 +811,13 @@ router.patch("/:id/seen", async (req, res) => {
 
     normalizeMessages(conversation);
 
-    const otherSender =
-      viewer === "advisor" ? "user" : "advisor";
+    const otherSender = viewer === "advisor" ? "user" : "advisor";
 
     const now = new Date();
 
     conversation.messages.forEach(
-      (message: {
-        sender: "user" | "advisor";
-        seen_at?: Date | null;
-      }) => {
-        if (
-          message.sender === otherSender &&
-          !message.seen_at
-        ) {
+      (message: { sender: "user" | "advisor"; seen_at?: Date | null }) => {
+        if (message.sender === otherSender && !message.seen_at) {
           message.seen_at = now;
         }
       },
@@ -786,4 +841,3 @@ router.patch("/:id/seen", async (req, res) => {
 });
 
 export default router;
-```
