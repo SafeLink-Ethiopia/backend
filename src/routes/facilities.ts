@@ -294,6 +294,44 @@ router.post(
     }
   },
 );
+/**
+ * PATCH /api/facilities/:facility_id
+ *
+ * Advisor only.
+ */
+router.patch(
+  "/:facility_id",
+  advisorAuthMiddleware,
+  async (req: AdvisorRequest, res) => {
+    try {
+      const { facility_id } = req.params;
+
+      const {
+        facility_name,
+        location,
+        contact,
+        support_types,
+        description,
+      } = req.body;
+
+      const facility = await Facility.findOne({ facility_id });
+
+      if (!facility) {
+        return res.status(404).json({
+          success: false,
+          message: "Facility not found",
+        });
+      }
+
+      if (
+        facility_name !== undefined &&
+        !facility_name?.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Facility name cannot be empty",
+        });
+      }
 
 /**
  * PATCH /api/facilities/:facility_id
